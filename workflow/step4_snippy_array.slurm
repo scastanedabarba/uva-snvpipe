@@ -27,6 +27,12 @@ PY
 
 echo "[snippy] task=${task_id} sample=${sid}"
 
+# modules-only for now
+if [[ "$MODE" != "modules" ]]; then
+  echo "ERROR: MODE must be 'modules' (got: $MODE)" >&2
+  exit 2
+fi
+
 ref_fa="${OUTROOT}/findref/ref.fa"
 [[ -s "$ref_fa" ]] || { echo "ERROR: missing cluster reference fasta: $ref_fa" >&2; exit 1; }
 
@@ -46,11 +52,20 @@ r2="${qc_dir}/${sid}_R2.trim.fq.gz"
 [[ -s "$r1" ]] || { echo "ERROR: missing QC R1: $r1" >&2; exit 1; }
 [[ -s "$r2" ]] || { echo "ERROR: missing QC R2: $r2" >&2; exit 1; }
 
+# Environment setup (Rivanna)
+module purge || true
 module load miniforge
+module load java
+
+# Activate Snippy env
+# (avoid 'set -u' issues with activate scripts referencing unset vars)
 set +u
 source activate /project/amr_services/.conda/amrpipe-snippy-env
 set -u
-module load java
+
+# Basic sanity checks
+command -v snippy >/dev/null 2>&1 || { echo "ERROR: snippy not found in PATH after env activation" >&2; exit 1; }
+command -v java   >/dev/null 2>&1 || { echo "ERROR: java not found in PATH" >&2; exit 1; }
 
 echo "[snippy] ref=${ref_fa}"
 echo "[snippy] r1=${r1}"
@@ -66,5 +81,4 @@ snippy \
   &> "${snippy_out}/snippy.log"
 
 touch "$done_flag"
-echo "[snippy] done"
-
+echo "[snippy] done -> $done_flag"

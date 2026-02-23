@@ -45,15 +45,14 @@ if [[ -f "$done_flag" ]]; then
   exit 0
 fi
 
-if [[ "$MODE" == "modules" ]]; then
-  module use /project/amr_services/modulefiles/
-  module load mash/2.3
-elif [[ "$MODE" == "apptainer" ]]; then
-  module load apptainer || true
-else
-  echo "ERROR: MODE must be modules or apptainer (got: $MODE)" >&2
+# modules-only for now
+if [[ "$MODE" != "modules" ]]; then
+  echo "ERROR: MODE must be 'modules' (got: $MODE)" >&2
   exit 2
 fi
+
+module use /project/amr_services/modulefiles/
+module load mash/2.3
 
 # -----------------------------
 # Locate QC reads robustly
@@ -92,27 +91,26 @@ fi
 
 echo -e "Determine closest species match using MASH distance ... \n"
 
-# EXACT original structure + filenames
-cat ${R1FASTQ} ${R2FASTQ} > ${OUTDIR}/${ACCID}.reads.fq.gz
-mash sketch -r -m 2 -k 21 -s 50000 ${OUTDIR}/${ACCID}.reads.fq.gz
+# EXACT original structure + filenames (gzip-safe)
+zcat "$R1FASTQ" "$R2FASTQ" | gzip -c > "${OUTDIR}/${ACCID}.reads.fq.gz"
+mash sketch -r -m 2 -k 21 -s 50000 "${OUTDIR}/${ACCID}.reads.fq.gz"
 
 # mash dist
-mash dist -p ${THREADS} ${OUTDIR}/${ACCID}.reads.fq.gz.msh ${MASHREF} > ${OUTDIR}/${ACCID}.mash-dist.output.txt
+mash dist -p "${THREADS}" "${OUTDIR}/${ACCID}.reads.fq.gz.msh" "${MASHREF}" > "${OUTDIR}/${ACCID}.mash-dist.output.txt"
 
 ### get top hit from mash-dist  (guard SIGPIPE from sort|head under pipefail)
 set +o pipefail
-refaccid=$(sort -gk3 ${OUTDIR}/${ACCID}.mash-dist.output.txt | head -1 | cut -f 2)
+refaccid=$(sort -gk3 "${OUTDIR}/${ACCID}.mash-dist.output.txt" | head -1 | cut -f 2)
 set -o pipefail
 
-refstr=$(awk -v var=${refaccid} '$1 == var' ${MASHREFMAP} | cut -f 2)
-echo -e "${ACCID}\t${refaccid}\t${refstr}" > ${OUTDIR}/${ACCID}.mash-ref.txt
+refstr=$(awk -v var="$refaccid" '$1 == var' "$MASHREFMAP" | cut -f 2)
+echo -e "${ACCID}\t${refaccid}\t${refstr}" > "${OUTDIR}/${ACCID}.mash-ref.txt"
 
 # mash screen
-mash screen -p ${THREADS} -w ${MASHREF} ${OUTDIR}/${ACCID}.reads.fq.gz | sort -gr > ${OUTDIR}/${ACCID}.mash-screen.output.txt
+mash screen -p "${THREADS}" -w "${MASHREF}" "${OUTDIR}/${ACCID}.reads.fq.gz" | sort -gr > "${OUTDIR}/${ACCID}.mash-screen.output.txt"
 
 ### get top3 hits from screening
-head -3 ${OUTDIR}/${ACCID}.mash-screen.output.txt > ${OUTDIR}/${ACCID}.mash-screen.top3_hits.txt
+head -3 "${OUTDIR}/${ACCID}.mash-screen.output.txt" > "${OUTDIR}/${ACCID}.mash-screen.top3_hits.txt"
 
 touch "$done_flag"
 echo "[mash] done -> $done_flag"
-

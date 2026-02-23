@@ -44,31 +44,19 @@ if [[ -f "$done_flag" ]]; then
   exit 0
 fi
 
-if [[ "$MODE" == "modules" ]]; then
-  module use /project/amr_services/modulefiles/
-  module load trimgalore
-  module load trimmomatic/0.39
-  module load fastqc/0.11.9
-  # fastqstats must be available in PATH in your module setup
-elif [[ "$MODE" == "apptainer" ]]; then
-  module load apptainer || true
-else
-  echo "ERROR: MODE must be modules or apptainer (got: $MODE)" >&2
+if [[ "$MODE" != "modules" ]]; then
+  echo "ERROR: MODE must be 'modules' (got: $MODE)" >&2
   exit 2
 fi
 
-run_cmd() {
-  if [[ "$MODE" == "apptainer" ]]; then
-    # If you want to use your QC container, uncomment and ensure it contains all tools:
-    # apptainer exec docker://ghcr.io/scastanedabarba/uvasnvpipe-qc_reads:v0.1.0 "$@"
-    "$@"
-  else
-    "$@"
-  fi
-}
+module use /project/amr_services/modulefiles/
+module load trimgalore
+module load trimmomatic/0.39
+module load fastqc/0.11.9
+
 
 # ---- Trim Galore (exact flags from your Nextflow module) ----
-run_cmd trim_galore --stringency 5 \
+trim_galore --stringency 5 \
   --trim-n \
   --max_n 5 \
   --length 35 \
@@ -88,7 +76,7 @@ if [[ -z "${tg_r1_fastq}" || -z "${tg_r2_fastq}" ]]; then
 fi
 
 # ---- Trimmomatic PE (exact parameters; run jar explicitly) ----
-run_cmd java -jar /project/amr_services/tools/Trimmomatic-0.39/trimmomatic-0.39.jar PE -phred33 \
+java -jar /project/amr_services/tools/Trimmomatic-0.39/trimmomatic-0.39.jar PE -phred33 \
   "$tg_r1_fastq" "$tg_r2_fastq" \
   "${sid}_R1.trim.fq.gz" "${sid}_R1.trim.unpaired.fq.gz" \
   "${sid}_R2.trim.fq.gz" "${sid}_R2.trim.unpaired.fq.gz" \

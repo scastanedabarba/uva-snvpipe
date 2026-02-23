@@ -6,11 +6,11 @@ set -euo pipefail
 
 SAMPLESHEET="$(readlink -f "$1")"
 OUTROOT="$2"
+PARSE_TRI="$3"
 
 # Updated locations (your snvdb_20260123 layout + local parse script)
-MAP_TSV="/scratch/sgj4qr/snv_pipeline/snvdb_20260123/mash/pathogen_refseq.chrom.mapping.txt"
-CHROM_FNA_DIR="/scratch/sgj4qr/snv_pipeline/snvdb_20260123/chrom_fna/"
-PARSE_TRI="/scratch/sgj4qr/snv_pipeline/simplepipe/scripts/parse_mash_triangle.v2.py"
+MAP_TSV="${4:-/scratch/sgj4qr/snv_pipeline/snvdb_20260123/mash/pathogen_refseq.chrom.mapping.txt}"
+CHROM_FNA_DIR="${5:-/scratch/sgj4qr/snv_pipeline/snvdb_20260123/chrom_fna/}"
 
 [[ -f "$MAP_TSV" ]]      || { echo "ERROR: missing mapping file: $MAP_TSV" >&2; exit 1; }
 [[ -d "$CHROM_FNA_DIR" ]]|| { echo "ERROR: missing chrom_fna dir: $CHROM_FNA_DIR" >&2; exit 1; }
@@ -106,5 +106,3 @@ cp -f "$ref_fa" "${findref_dir}/ref.fa"
 echo "[findref] chosen ref: $ref_label"
 echo "[findref] ref_fa: $ref_fa"
 echo "[findref] wrote: ${findref_dir}/ref.fa"
-
-
