@@ -5,6 +5,9 @@
 set -euo pipefail
 
 OUTROOT="$1"
+CLUSTER_SCRIPT="$2"
+
+[[ -f "$CLUSTER_SCRIPT" ]] || { echo "ERROR: missing cluster script: $CLUSTER_SCRIPT" >&2; exit 1; }
 
 module load miniforge
 set +u
@@ -27,7 +30,7 @@ mapfile -t dirs < <(find "$snippy_root" -maxdepth 1 -mindepth 1 -type d | sort)
 echo "[core] n_isolates=${#dirs[@]}"
 echo "[core] running snippy-core ..."
 
-# IMPORTANT: run snippy-core from within snippy_root so core.* outputs land in OUTROOT/snippy/
+# Run snippy-core from within snippy_root so core.* outputs land in OUTROOT/snippy/
 cd "$snippy_root"
 snippy-core --ref "$ref_fa" "${dirs[@]}" &> "${summary_dir}/snippy_core.log"
 
@@ -37,9 +40,17 @@ snp-sites -b -c -o "${summary_dir}/phylo.aln" "${snippy_root}/core.full.aln"
 echo "[core] running snp-dists ..."
 snp-dists "${snippy_root}/core.aln" > "${summary_dir}/core.snp-dists.txt"
 
+echo "[core] clustering isolates (<=50 SNP) + attaching species ..."
+python3 "$CLUSTER_SCRIPT" \
+  --snp-dists "${summary_dir}/core.snp-dists.txt" \
+  --outdir "$OUTROOT" \
+  --threshold 50 \
+  --output "${summary_dir}/isolate_groups.tsv"
+
 echo "[core] outputs:"
 echo "  ${snippy_root}/core.aln"
 echo "  ${snippy_root}/core.full.aln"
 echo "  ${summary_dir}/phylo.aln"
 echo "  ${summary_dir}/core.snp-dists.txt"
+echo "  ${summary_dir}/isolate_groups.tsv"
 echo "  ${summary_dir}/snippy_core.log"

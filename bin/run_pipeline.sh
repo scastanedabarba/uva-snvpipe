@@ -131,7 +131,7 @@ CORE_JOBID=$(
     -J "snippy_core" \
     -o "${LOGDIR}/snippy_core.%j.out" -e "${LOGDIR}/snippy_core.%j.err" \
     "${WORKFLOW_DIR}/step5_core.slurm" \
-      "$OUTDIR"
+      "$OUTDIR" "${SCRIPTS_DIR}/cluster_isolates.py"
 )
 echo "[submit] CORE job: $CORE_JOBID"
 
