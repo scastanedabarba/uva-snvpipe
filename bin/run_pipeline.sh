@@ -2,52 +2,97 @@
 set -euo pipefail
 
 usage() {
-  cat <<'EOF'
-UVA SNV Pipeline (SLURM orchestrator)
+  cat <<EOF
+UVA SNV Pipeline
 
 USAGE:
-  run_pipeline.sh [samplesheet.csv]
+  run_pipeline.sh [options]
 
 OPTIONS:
-  -h, --help        Show this help message and exit
+  --samplesheet FILE   Path to samplesheet CSV
+  --outdir DIR         Output directory (overrides config.sh OUTDIR)
+  -h, --help           Show this help message
 
-ARGUMENTS:
-  samplesheet.csv   Optional path to a CSV with columns:
-                    sample, fastq_1, fastq_2
-                    Default: config/samplesheet.csv
+Samplesheet format (CSV):
+  sample,fastq_1,fastq_2
 
-NOTES:
-  - Configuration is loaded from: config/config.sh
-  - This version is modules-only (no containers).
-  - Outputs and logs are written to paths defined in config/config.sh (OUTDIR, LOGDIR).
-
-EXAMPLE:
-  bin/run_pipeline.sh config/samplesheet.csv
+Example:
+  run_pipeline.sh --samplesheet config/samplesheet.csv --outdir results/test_run
 EOF
 }
 
-# Handle help flags
-if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-  usage
-  exit 0
-fi
+# -----------------------------
+# Parse arguments
+# -----------------------------
+SAMPLESHEET=""
+USER_OUTDIR=""
 
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --samplesheet)
+      SAMPLESHEET="$2"
+      shift 2
+      ;;
+    --outdir)
+      USER_OUTDIR="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "ERROR: Unknown argument: $1"
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+# -----------------------------
+# Repo paths
+# -----------------------------
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BIN_DIR="${REPO_DIR}/bin"
 WORKFLOW_DIR="${REPO_DIR}/workflow"
 SCRIPTS_DIR="${REPO_DIR}/scripts"
 CONFIG_DIR="${REPO_DIR}/config"
 
-# Load pipeline configuration
+# -----------------------------
+# Load config defaults
+# -----------------------------
 source "${CONFIG_DIR}/config.sh"
 
-# Default samplesheet location
-SAMPLESHEET="${1:-${CONFIG_DIR}/samplesheet.csv}"
+# -----------------------------
+# Override OUTDIR if provided
+# -----------------------------
+if [[ -n "$USER_OUTDIR" ]]; then
+  OUTDIR="$(readlink -f "$USER_OUTDIR")"
+fi
+
+# Default samplesheet if not provided
+if [[ -z "$SAMPLESHEET" ]]; then
+  SAMPLESHEET="${CONFIG_DIR}/samplesheet.csv"
+fi
+
 [[ -f "$SAMPLESHEET" ]] || { echo "ERROR: samplesheet not found: $SAMPLESHEET" >&2; exit 1; }
 
-mkdir -p "$OUTDIR" "$LOGDIR" \
-  "$OUTDIR/qc" "$OUTDIR/mash" "$OUTDIR/findref" "$OUTDIR/snippy" "$OUTDIR/summary" "$OUTDIR/status"
+LOGDIR="${OUTDIR}/slurm_logs"
 
+# -----------------------------
+# Create output structure
+# -----------------------------
+mkdir -p "$OUTDIR" "$LOGDIR" \
+  "$OUTDIR/qc" \
+  "$OUTDIR/mash" \
+  "$OUTDIR/findref" \
+  "$OUTDIR/snippy" \
+  "$OUTDIR/summary" \
+  "$OUTDIR/status"
+
+# -----------------------------
+# Count samples
+# -----------------------------
 NSAMPLES=$(
   python3 - <<'PY' "$SAMPLESHEET"
 import csv, sys
@@ -58,17 +103,18 @@ with open(path, newline='') as f:
 print(len(rows))
 PY
 )
+
 [[ "$NSAMPLES" -gt 0 ]] || { echo "ERROR: No samples found in $SAMPLESHEET" >&2; exit 1; }
 
 echo "[pipeline] samplesheet=$SAMPLESHEET"
 echo "[pipeline] nsamples=$NSAMPLES"
-echo "[pipeline] repo_dir=$REPO_DIR"
-echo "[pipeline] workflow_dir=$WORKFLOW_DIR"
 echo "[pipeline] outdir=$OUTDIR"
 echo "[pipeline] logdir=$LOGDIR"
 echo "[pipeline] mode=$MODE"
 
-# ---------- Step 1: QC array ----------
+# -----------------------------
+# Step 1: QC
+# -----------------------------
 QC_JOBID=$(
   sbatch --parsable \
     -A "$ACCOUNT" -p "$PARTITION" \
@@ -81,7 +127,9 @@ QC_JOBID=$(
 )
 echo "[submit] QC array job: $QC_JOBID"
 
-# ---------- Step 2: MASH array (after QC) ----------
+# -----------------------------
+# Step 2: MASH
+# -----------------------------
 MASH_JOBID=$(
   sbatch --parsable \
     --dependency=afterok:"$QC_JOBID" \
@@ -95,7 +143,9 @@ MASH_JOBID=$(
 )
 echo "[submit] MASH array job: $MASH_JOBID"
 
-# ---------- Step 3: FINDREF (single job after MASH) ----------
+# -----------------------------
+# Step 3: FINDREF
+# -----------------------------
 FINDREF_JOBID=$(
   sbatch --parsable \
     --dependency=afterok:"$MASH_JOBID" \
@@ -108,7 +158,9 @@ FINDREF_JOBID=$(
 )
 echo "[submit] FINDREF job: $FINDREF_JOBID"
 
-# ---------- Step 4: SNIPPY array (after FINDREF) ----------
+# -----------------------------
+# Step 4: SNIPPY
+# -----------------------------
 SNIPPY_JOBID=$(
   sbatch --parsable \
     --dependency=afterok:"$FINDREF_JOBID" \
@@ -122,7 +174,9 @@ SNIPPY_JOBID=$(
 )
 echo "[submit] SNIPPY array job: $SNIPPY_JOBID"
 
-# ---------- Step 5: CORE + SNP-DISTS (single job after SNIPPY) ----------
+# -----------------------------
+# Step 5: CORE + CLUSTER
+# -----------------------------
 CORE_JOBID=$(
   sbatch --parsable \
     --dependency=afterok:"$SNIPPY_JOBID" \
