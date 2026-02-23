@@ -30,12 +30,12 @@ mapfile -t dirs < <(find "$snippy_root" -maxdepth 1 -mindepth 1 -type d | sort)
 echo "[core] n_isolates=${#dirs[@]}"
 echo "[core] running snippy-core ..."
 
-# Run snippy-core from within snippy_root so core.* outputs land in OUTROOT/snippy/
+# Run snippy-core from inside snippy_root so core.* outputs land here
 cd "$snippy_root"
-snippy-core --ref "$ref_fa" "${dirs[@]}" &> "${summary_dir}/snippy_core.log"
+snippy-core --ref "$ref_fa" "${dirs[@]}" &> "${snippy_root}/snippy_core.log"
 
 echo "[core] running snp-sites ..."
-snp-sites -b -c -o "${summary_dir}/phylo.aln" "${snippy_root}/core.full.aln"
+snp-sites -b -c -o "${snippy_root}/phylo.aln" "${snippy_root}/core.full.aln"
 
 echo "[core] running snp-dists ..."
 snp-dists "${snippy_root}/core.aln" > "${summary_dir}/core.snp-dists.txt"
@@ -50,7 +50,7 @@ python3 "$CLUSTER_SCRIPT" \
 echo "[core] outputs:"
 echo "  ${snippy_root}/core.aln"
 echo "  ${snippy_root}/core.full.aln"
-echo "  ${summary_dir}/phylo.aln"
+echo "  ${snippy_root}/phylo.aln"
+echo "  ${snippy_root}/snippy_core.log"
 echo "  ${summary_dir}/core.snp-dists.txt"
 echo "  ${summary_dir}/isolate_groups.tsv"
-echo "  ${summary_dir}/snippy_core.log"
