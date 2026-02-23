@@ -4,12 +4,12 @@ A SLURM-based whole genome SNV analysis pipeline for bacterial isolates.
 
 This pipeline performs:
 
-1.  Read QC and trimming\
-2.  Mash-based speciation and reference selection\
-3.  Reference-guided SNV calling (Snippy)\
-4.  Core genome alignment\
-5.  SNP distance matrix generation\
-6.  SNP-based clustering (≤ 50 SNP threshold) with species annotation
+-   Read QC and trimming
+-   Mash-based speciation and reference selection
+-   Reference-guided SNV calling (Snippy)
+-   Core genome alignment
+-   SNP distance matrix generation
+-   SNP-based clustering (≤ 50 SNP threshold) with species annotation
 
 Designed for HPC environments (tested on UVA Rivanna).
 
@@ -20,16 +20,15 @@ Designed for HPC environments (tested on UVA Rivanna).
 ## 1. Clone the repository
 
 ``` bash
-git clone https://github.com/<your-username>/<your-repo>.git
-cd <your-repo>
+git clone https://github.com/scastanedabarba/uva-snvpipe.git
+cd uva-snvpipe
 ```
 
 ## 2. Configure environment
 
-This pipeline currently runs using **HPC modules and conda
-environments**.
+This pipeline runs using HPC modules and a conda environment.
 
-Ensure the following tools are available:
+Required tools:
 
 -   Mash 2.3
 -   TrimGalore
@@ -40,19 +39,7 @@ Ensure the following tools are available:
 -   snp-dists
 -   Python 3
 
-Example (Rivanna-style):
-
-``` bash
-module use /project/amr_services/modulefiles/
-module load mash/2.3
-module load trimgalore
-module load trimmomatic/0.39
-module load snp-dists
-module load miniforge
-source activate /project/amr_services/.conda/amrpipe-snippy-env
-```
-
-Modify paths in:
+Edit configuration file:
 
 ``` bash
 config/config.sh
@@ -71,7 +58,7 @@ MASH_DB=/path/to/pathogen_refseq.chrom.k21s50000.msh
 
 # Samplesheet Format
 
-CSV file with header:
+CSV header:
 
     sample,fastq_1,fastq_2
 
@@ -86,25 +73,25 @@ Absolute paths to FASTQ files are recommended.
 
 # Usage
 
-## Basic Run (using defaults in config.sh)
+## Run with defaults from config.sh
 
 ``` bash
 bash bin/run_pipeline.sh
 ```
 
-## Specify Samplesheet
+## Specify a samplesheet
 
 ``` bash
-bash bin/run_pipeline.sh   --samplesheet config/samplesheet.csv
+bash bin/run_pipeline.sh --samplesheet config/samplesheet.csv
 ```
 
-## Specify Output Directory
+## Specify an output directory
 
 ``` bash
 bash bin/run_pipeline.sh   --samplesheet config/samplesheet.csv   --outdir /scratch/sgj4qr/snv_pipeline/test_run
 ```
 
-If `--outdir` is provided, it overrides `OUTDIR` in `config.sh`.
+If `--outdir` is provided, it overrides `OUTDIR` in config.sh.
 
 ------------------------------------------------------------------------
 
@@ -231,7 +218,7 @@ Columns:
 
 ------------------------------------------------------------------------
 
-# Current Version
+# Version
 
 v0.1.0\
 First fully operational SLURM + modules-based release.
