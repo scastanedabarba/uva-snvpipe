@@ -5,9 +5,9 @@
 set -euo pipefail
 
 SAMPLESHEET="$1"
-OUTROOT="$2"
+OUTROOT="$2"   # now: OUTDIR_ROOT (top-level)
 MODE="$3"
-MASHREF="$4"          # same as MASH_DB in config, but keeping your original var name
+MASHREF="$4"
 
 task_id="${SLURM_ARRAY_TASK_ID}"
 
@@ -45,7 +45,6 @@ if [[ -f "$done_flag" ]]; then
   exit 0
 fi
 
-# modules-only for now
 if [[ "$MODE" != "modules" ]]; then
   echo "ERROR: MODE must be 'modules' (got: $MODE)" >&2
   exit 2
@@ -54,10 +53,6 @@ fi
 module use /project/amr_services/modulefiles/
 module load mash/2.3
 
-# -----------------------------
-# Locate QC reads robustly
-# Prefer final Trimmomatic outputs, else fall back to TrimGalore val_1/val_2
-# -----------------------------
 R1FASTQ="${qc_dir}/${ACCID}_R1.trim.fq.gz"
 R2FASTQ="${qc_dir}/${ACCID}_R2.trim.fq.gz"
 
@@ -70,10 +65,6 @@ if [[ ! -s "$R1FASTQ" || ! -s "$R2FASTQ" ]]; then
     R2FASTQ="$tg_r2"
   else
     echo "ERROR: Could not find QC reads for ${ACCID}" >&2
-    echo "Tried:" >&2
-    echo "  $R1FASTQ" >&2
-    echo "  $R2FASTQ" >&2
-    echo "Also searched for *val_1.fq.gz/*val_2.fq.gz in: $qc_dir" >&2
     ls -lah "$qc_dir" >&2 || true
     exit 1
   fi
@@ -82,23 +73,17 @@ fi
 echo "[mash] R1FASTQ=${R1FASTQ}"
 echo "[mash] R2FASTQ=${R2FASTQ}"
 
-# mapping file sits next to the .msh in your DB directory
 MASHREFMAP="$(dirname "$MASHREF")/pathogen_refseq.chrom.mapping.txt"
 if [[ ! -s "$MASHREFMAP" ]]; then
   echo "ERROR: Missing MASHREFMAP: $MASHREFMAP" >&2
   exit 1
 fi
 
-echo -e "Determine closest species match using MASH distance ... \n"
-
-# EXACT original structure + filenames (gzip-safe)
 zcat "$R1FASTQ" "$R2FASTQ" | gzip -c > "${OUTDIR}/${ACCID}.reads.fq.gz"
 mash sketch -r -m 2 -k 21 -s 50000 "${OUTDIR}/${ACCID}.reads.fq.gz"
 
-# mash dist
 mash dist -p "${THREADS}" "${OUTDIR}/${ACCID}.reads.fq.gz.msh" "${MASHREF}" > "${OUTDIR}/${ACCID}.mash-dist.output.txt"
 
-### get top hit from mash-dist  (guard SIGPIPE from sort|head under pipefail)
 set +o pipefail
 refaccid=$(sort -gk3 "${OUTDIR}/${ACCID}.mash-dist.output.txt" | head -1 | cut -f 2)
 set -o pipefail
@@ -106,10 +91,7 @@ set -o pipefail
 refstr=$(awk -v var="$refaccid" '$1 == var' "$MASHREFMAP" | cut -f 2)
 echo -e "${ACCID}\t${refaccid}\t${refstr}" > "${OUTDIR}/${ACCID}.mash-ref.txt"
 
-# mash screen
 mash screen -p "${THREADS}" -w "${MASHREF}" "${OUTDIR}/${ACCID}.reads.fq.gz" | sort -gr > "${OUTDIR}/${ACCID}.mash-screen.output.txt"
-
-### get top3 hits from screening
 head -3 "${OUTDIR}/${ACCID}.mash-screen.output.txt" > "${OUTDIR}/${ACCID}.mash-screen.top3_hits.txt"
 
 touch "$done_flag"

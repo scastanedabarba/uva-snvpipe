@@ -8,6 +8,9 @@ SAMPLESHEET="$1"
 OUTROOT="$2"
 MODE="$3"
 
+# NEW: QCROOT is the directory that contains qc/<isolate>/... (default: parent of OUTROOT)
+QCROOT="${4:-$(dirname "$OUTROOT")}"
+
 task_id="${SLURM_ARRAY_TASK_ID}"
 
 read -r sid r1_raw r2_raw < <(
@@ -26,6 +29,8 @@ PY
 )
 
 echo "[snippy] task=${task_id} sample=${sid}"
+echo "[snippy] outroot=${OUTROOT}"
+echo "[snippy] qcroot=${QCROOT}"
 
 # modules-only for now
 if [[ "$MODE" != "modules" ]]; then
@@ -36,7 +41,7 @@ fi
 ref_fa="${OUTROOT}/findref/ref.fa"
 [[ -s "$ref_fa" ]] || { echo "ERROR: missing cluster reference fasta: $ref_fa" >&2; exit 1; }
 
-qc_dir="${OUTROOT}/qc/${sid}"
+qc_dir="${QCROOT}/qc/${sid}"
 snippy_out="${OUTROOT}/snippy/${sid}"
 status_dir="${OUTROOT}/status"
 mkdir -p "$snippy_out" "$status_dir"
@@ -58,12 +63,10 @@ module load miniforge
 module load java
 
 # Activate Snippy env
-# (avoid 'set -u' issues with activate scripts referencing unset vars)
 set +u
 source activate /project/amr_services/.conda/amrpipe-snippy-env
 set -u
 
-# Basic sanity checks
 command -v snippy >/dev/null 2>&1 || { echo "ERROR: snippy not found in PATH after env activation" >&2; exit 1; }
 command -v java   >/dev/null 2>&1 || { echo "ERROR: java not found in PATH" >&2; exit 1; }
 

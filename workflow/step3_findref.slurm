@@ -8,13 +8,24 @@ SAMPLESHEET="$(readlink -f "$1")"
 OUTROOT="$2"
 PARSE_TRI="$3"
 
-# Updated locations (your snvdb_20260123 layout + local parse script)
-MAP_TSV="${4:-/scratch/sgj4qr/snv_pipeline/snvdb_20260123/mash/pathogen_refseq.chrom.mapping.txt}"
-CHROM_FNA_DIR="${5:-/scratch/sgj4qr/snv_pipeline/snvdb_20260123/chrom_fna/}"
+# NEW: MASHROOT is the directory that contains mash/<isolate>/... (default: parent of OUTROOT)
+# Backward-compatible heuristic:
+#   - if $4 looks like a mapping file, treat it as MAP_TSV (old calling style)
+#   - otherwise treat $4 as MASHROOT
+ARG4="${4:-}"
+if [[ -n "$ARG4" && "$(basename "$ARG4")" == *mapping*.txt ]]; then
+  MASHROOT="$(readlink -f "$(dirname "$OUTROOT")")"
+  MAP_TSV="$(readlink -f "$ARG4")"
+  CHROM_FNA_DIR="${5:-/scratch/sgj4qr/snv_pipeline/snvdb_20260123/chrom_fna/}"
+else
+  MASHROOT="$(readlink -f "${ARG4:-$(dirname "$OUTROOT")}")"
+  MAP_TSV="${5:-/scratch/sgj4qr/snv_pipeline/snvdb_20260123/mash/pathogen_refseq.chrom.mapping.txt}"
+  CHROM_FNA_DIR="${6:-/scratch/sgj4qr/snv_pipeline/snvdb_20260123/chrom_fna/}"
+fi
 
-[[ -f "$MAP_TSV" ]]      || { echo "ERROR: missing mapping file: $MAP_TSV" >&2; exit 1; }
-[[ -d "$CHROM_FNA_DIR" ]]|| { echo "ERROR: missing chrom_fna dir: $CHROM_FNA_DIR" >&2; exit 1; }
-[[ -f "$PARSE_TRI" ]]    || { echo "ERROR: missing parse script: $PARSE_TRI" >&2; exit 1; }
+[[ -f "$MAP_TSV" ]]       || { echo "ERROR: missing mapping file: $MAP_TSV" >&2; exit 1; }
+[[ -d "$CHROM_FNA_DIR" ]] || { echo "ERROR: missing chrom_fna dir: $CHROM_FNA_DIR" >&2; exit 1; }
+[[ -f "$PARSE_TRI" ]]     || { echo "ERROR: missing parse script: $PARSE_TRI" >&2; exit 1; }
 
 module use /project/amr_services/modulefiles/
 module load mash/2.3
@@ -36,29 +47,28 @@ PY
 ))
 
 echo "[findref] n_samples=${#samples[@]}"
+echo "[findref] mashroot=${MASHROOT}"
+echo "[findref] outroot=${OUTROOT}"
 echo "[findref] copying isolate sketches + sketching candidate refs"
 
 # 1) Copy isolate sketches into msh/
 for sid in "${samples[@]}"; do
-  iso_msh="${OUTROOT}/mash/${sid}/${sid}.reads.fq.gz.msh"
+  iso_msh="${MASHROOT}/mash/${sid}/${sid}.reads.fq.gz.msh"
   [[ -s "$iso_msh" ]] || { echo "ERROR: missing isolate sketch: $iso_msh" >&2; exit 1; }
   cp -f "$iso_msh" "$msh_dir/"
 done
 
-# 2) For each isolate: read its top-hit ref_seqid (from legacy mash-ref) and sketch that reference
+# 2) For each isolate: read its top-hit ref_seqid (from mash-ref) and sketch that reference
 for sid in "${samples[@]}"; do
-  mash_ref="${OUTROOT}/mash/${sid}/${sid}.mash-ref.txt"
+  mash_ref="${MASHROOT}/mash/${sid}/${sid}.mash-ref.txt"
   [[ -s "$mash_ref" ]] || { echo "ERROR: missing mash-ref: $mash_ref" >&2; exit 1; }
 
-  # mash-ref.txt schema: sample  ref_seqid  refstr...
   ref_seqid="$(awk 'NR==1{print $2}' "$mash_ref")"
   [[ -n "$ref_seqid" ]] || { echo "ERROR: empty ref_seqid for $sid in $mash_ref" >&2; exit 1; }
 
-  # Convert ref_seqid to ref_accid (use left token before '|', e.g. GCF_XXXX.Y)
   ref_accid="${ref_seqid%%|*}"
   [[ -n "$ref_accid" ]] || { echo "ERROR: could not parse ref_accid from ref_seqid=$ref_seqid (sample=$sid)" >&2; exit 1; }
 
-  # Find the reference fasta and sketch it
   reffa="$(find "$CHROM_FNA_DIR" -name "${ref_accid}*.fna" | head -n 1 || true)"
   if [[ -z "${reffa}" ]]; then
     echo "WARN: No chrom_fna fasta found for ${ref_accid} (from ${ref_seqid}); skipping"
@@ -78,7 +88,6 @@ mash triangle -p "${SLURM_CPUS_PER_TASK:-8}" -l "${msh_dir}/msh_linelist" > "${f
 
 # 4) Parse to closest-ref
 python3 "$PARSE_TRI" -t "${findref_dir}/mash-triangle.output.txt" -o "${findref_dir}/mash-closest-ref.txt"
-
 echo "[findref] wrote: ${findref_dir}/mash-closest-ref.txt"
 
 # 5) Extract chosen reference label and prepare ref.fa for snippy
@@ -87,8 +96,6 @@ ref_label="$(awk 'NR==1{print $1; exit}' "${findref_dir}/mash-closest-ref.txt")"
 
 echo "$ref_label" > "${findref_dir}/ref_accid.txt"
 
-# If parser returns a filename (ends with .fna), use it directly.
-# Otherwise treat it as an accession prefix and find the matching .fna.
 if [[ "$ref_label" == *.fna ]]; then
   ref_fa="${CHROM_FNA_DIR%/}/${ref_label}"
 else
