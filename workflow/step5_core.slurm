@@ -40,12 +40,12 @@ snp-sites -b -c -o "${snippy_root}/phylo.aln" "${snippy_root}/core.full.aln"
 echo "[core] running snp-dists ..."
 snp-dists "${snippy_root}/core.aln" > "${summary_dir}/core.snp-dists.txt"
 
-echo "[core] clustering isolates (<=50 SNP) + attaching species ..."
+echo "[core] initial clustering (<=200 SNP) + attaching species ..."
 python3 "$CLUSTER_SCRIPT" \
   --snp-dists "${summary_dir}/core.snp-dists.txt" \
   --outdir "$OUTROOT" \
-  --threshold 50 \
-  --output "${summary_dir}/isolate_groups.tsv"
+  --threshold 200 \
+  --output "${summary_dir}/initial_groups.tsv"
 
 echo "[core] outputs:"
 echo "  ${snippy_root}/core.aln"
@@ -53,4 +53,4 @@ echo "  ${snippy_root}/core.full.aln"
 echo "  ${snippy_root}/phylo.aln"
 echo "  ${snippy_root}/snippy_core.log"
 echo "  ${summary_dir}/core.snp-dists.txt"
-echo "  ${summary_dir}/isolate_groups.tsv"
+echo "  ${summary_dir}/initial_groups.tsv"
