@@ -112,8 +112,8 @@ If `--outdir` is provided, it overrides `OUTDIR` in `config.sh`.
 ## Specify thresholds for clustering in each round of varint calling (step 5 and 8)
 
 ```bash
-bash bin/run_pipeline.sh --samplesheet config/samplesheet.csv --outdir /scratch/sgj4qr/snv_pipeline/test_run \
-  --round1-threshold 200 \
+bash bin/run_pipeline.sh --samplesheet config/samplesheet.csv --outdir /scratch/sgj4qr/snv_pipeline/test_run 
+  --round1-threshold 200 
   --round2-threshold 50
 ```
 
