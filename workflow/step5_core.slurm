@@ -6,6 +6,7 @@ set -euo pipefail
 
 OUTROOT="$1"          # variant_calling_round1
 CLUSTER_SCRIPT="$2"
+THRESHOLD="${3:-200}"
 
 [[ -f "$CLUSTER_SCRIPT" ]] || { echo "ERROR: missing cluster script: $CLUSTER_SCRIPT" >&2; exit 1; }
 
@@ -45,7 +46,7 @@ echo "[core] initial clustering (<=200 SNP) + attaching species ..."
 python3 "$CLUSTER_SCRIPT" \
   --snp-dists "${summary_dir}/core.snp-dists.txt" \
   --outdir "$TOP_OUTDIR" \
-  --threshold 200 \
+  --threshold "$THRESHOLD" \
   --output "${summary_dir}/initial_groups.tsv"
 
 echo "[core] outputs:"

@@ -6,9 +6,7 @@ This pipeline performs:
 
 - Read QC and trimming
 - Mash-based speciation (per isolate)
-- **Two rounds of reference-guided SNV calling (Snippy)**
-- Core genome alignment
-- SNP distance matrix generation
+- Two rounds of reference-guided SNV calling (Snippy)
 - SNP-based clustering with species annotation
 
 ## Why two rounds of variant calling?
@@ -19,7 +17,7 @@ To reduce this effect, the pipeline runs:
 
 1. **Variant calling Round 1**: call SNPs across all isolates and compute a distance matrix.
 2. **Initial clustering (threshold = 200 SNP)**: define *broad* relatedness groups.
-3. **Variant calling Round 2 (within each broad group)**: re-select a reference *per group*, re-run Snippy and snippy-core, then compute **final** SNP distances and clusters (**threshold = 50 SNP**) within each group.
+3. **Variant calling Round 2 (within each broad group)**: re-select a reference *per group*, re-run Snippy and snippy-core, then compute **final** SNP distances and clusters within each group. The default threshold for final SNP clustering can be specified by the user, 50 is set as the default.
 
 Singletons / unrelated isolates (no links under the Round 1 threshold) are carried through as **Unrelated** and are not re-run in Round 2.
 
@@ -84,7 +82,7 @@ PGCoE1,/scratch/reads/PGCoE1_R1.fastq.gz,/scratch/reads/PGCoE1_R2.fastq.gz
 PGCoE2,/scratch/reads/PGCoE2_R1.fastq.gz,/scratch/reads/PGCoE2_R2.fastq.gz
 ```
 
-Absolute paths to FASTQ files are recommended.
+Absolute paths to FASTQ files are required.
 
 ---
 
@@ -109,6 +107,15 @@ bash bin/run_pipeline.sh --samplesheet config/samplesheet.csv --outdir /scratch/
 ```
 
 If `--outdir` is provided, it overrides `OUTDIR` in `config.sh`.
+
+
+## Specify thresholds for clustering in each round of varint calling (step 5 and 8)
+
+```bash
+bash bin/run_pipeline.sh --samplesheet config/samplesheet.csv --outdir /scratch/sgj4qr/snv_pipeline/test_run \
+  --round1-threshold 200 \
+  --round2-threshold 50
+```
 
 ---
 

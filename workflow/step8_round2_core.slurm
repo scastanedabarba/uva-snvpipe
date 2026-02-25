@@ -8,6 +8,7 @@ OUTDIR_ROOT="$(readlink -f "$1")"
 ROUND2_OUTDIR="$(readlink -f "$2")"
 FINAL_OUTDIR="$(readlink -f "$3")"
 CLUSTER_SCRIPT="$(readlink -f "$4")"
+THRESHOLD="${5:-50}"
 
 groups_tsv="${ROUND2_OUTDIR}/manifest/groups.tsv"
 singletons_tsv="${ROUND2_OUTDIR}/manifest/singletons.tsv"
@@ -61,7 +62,7 @@ while read -r grp nmem; do
   python3 "$CLUSTER_SCRIPT" \
     --snp-dists "$group_snp" \
     --outdir "$OUTDIR_ROOT" \
-    --threshold 50 \
+    --threshold "$THRESHOLD" \
     --output "$group_final"
 
   # copy matrix to final_output for easy access

@@ -11,6 +11,8 @@ USAGE:
 OPTIONS:
   --samplesheet FILE   Path to samplesheet CSV (default: config/samplesheet.csv)
   --outdir DIR         Output root directory (overrides config.sh OUTDIR)
+  --round1-threshold INT  SNP threshold for initial clustering (default: 200)
+  --round2-threshold INT  SNP threshold for final clustering within groups (default: 50)
   -h, --help           Show this help message and exit
 
 SAMPLESHEET FORMAT (CSV):
@@ -28,11 +30,15 @@ EOF
 
 SAMPLESHEET=""
 USER_OUTDIR=""
+ROUND1_THRESHOLD="200"
+ROUND2_THRESHOLD="50"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --samplesheet) SAMPLESHEET="$2"; shift 2 ;;
     --outdir)      USER_OUTDIR="$2"; shift 2 ;;
+    --round1-threshold) ROUND1_THRESHOLD="$2"; shift 2 ;;
+    --round2-threshold) ROUND2_THRESHOLD="$2"; shift 2 ;;
     -h|--help)     usage; exit 0 ;;
     *) echo "ERROR: Unknown argument: $1" >&2; usage >&2; exit 1 ;;
   esac
@@ -165,7 +171,7 @@ CORE_JOBID=$(
     -J "core_r1" \
     -o "${LOGDIR}/step5_core.%j.out" -e "${LOGDIR}/step5_core.%j.err" \
     "${WORKFLOW_DIR}/step5_core.slurm" \
-      "$VC1_OUTDIR" "${SCRIPTS_DIR}/cluster_isolates.py"
+      "$VC1_OUTDIR" "${SCRIPTS_DIR}/cluster_isolates.py" "$ROUND1_THRESHOLD"
 )
 echo "[submit] Step5 CORE+CLUSTER job: $CORE_JOBID"
 
@@ -206,7 +212,7 @@ R2_CORE_JOBID=$(
     -J "core_r2" \
     -o "${LOGDIR}/step8_r2_core.%j.out" -e "${LOGDIR}/step8_r2_core.%j.err" \
     "${WORKFLOW_DIR}/step8_round2_core.slurm" \
-      "$OUTDIR_ROOT" "$VC2_OUTDIR" "$FINAL_OUTDIR" "${SCRIPTS_DIR}/cluster_isolates.py"
+      "$OUTDIR_ROOT" "$VC2_OUTDIR" "$FINAL_OUTDIR" "${SCRIPTS_DIR}/cluster_isolates.py" "$ROUND2_THRESHOLD"
 )
 echo "[submit] Step8 ROUND2 CORE+FINAL job: $R2_CORE_JOBID"
 
