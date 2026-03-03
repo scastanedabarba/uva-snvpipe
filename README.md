@@ -9,10 +9,10 @@ A SLURM-based whole genome SNV analysis pipeline for bacterial isolates\
 
 This pipeline performs:
 
--   Read QC and trimming
--   Mash-based speciation
--   **Two rounds of reference-guided SNV calling (Snippy)**
--   SNP-based clustering with species annotation
+-   Read QC and trimming\
+-   Mash-based speciation (per isolate)\
+-   **Two rounds of reference-guided SNV calling (Snippy)**\
+-   SNP-based clustering with species annotation\
 -   Final consolidated grouping table for reporting
 
 ------------------------------------------------------------------------
@@ -23,24 +23,25 @@ This pipeline performs:
 ```{=html}
 <summary>
 ```
-`<strong>`{=html}🧠 Why Two Rounds of Variant Calling?`</strong>`{=html}
+🧠 Why two rounds of variant calling?
 ```{=html}
 </summary>
 ```
 Using a single shared reference for a diverse set of isolates can
-inflate SNP distances when distant isolates are included.
+inflate SNP distances when distant isolates are included (mapping and
+variant calling become less comparable across the cohort).
 
-To improve clustering resolution:
+To reduce this effect, the pipeline runs:
 
 1.  **Round 1** --- SNV calling across all isolates\
 2.  **Initial clustering (default: 200 SNP)** --- define broad
     relatedness groups\
-3.  **Round 2** --- Re-select a reference per group and re-run SNV
+3.  **Round 2** --- re-select a reference per group and re-run SNV
     calling\
 4.  **Final clustering (default: 50 SNP)** --- within-group resolution
 
-Singleton/unrelated isolates are carried forward but not reprocessed in
-Round 2.
+Singleton/unrelated isolates are carried forward but are not reprocessed
+in Round 2.
 
 ```{=html}
 </details>
@@ -59,30 +60,30 @@ cd uva-snvpipe
 
 ------------------------------------------------------------------------
 
-## 2️⃣ Download the Reference Database (Required)
+## 2️⃣ Download the reference database (Required)
 
 The pipeline requires the **UVA ESKAPE reference database**.
 
-**Zenodo DOI:**\
-`10.5281/zenodo.18838576`
+**Zenodo DOI:** `10.5281/zenodo.18838576`\
+**File:** `uva_eskape_2026-01-23.tar.gz`
 
-### Install to default location (recommended)
+### Download database to the default location (inside the repo)
 
 ``` bash
 bash scripts/download_db.sh
 ```
 
-Installs to:
+Default install location:
 
     databases/uva_eskape_2026-01-23/
 
-### Install to a custom location
+### Download database to a custom location
 
 ``` bash
 bash scripts/download_db.sh --output /scratch/my_databases
 ```
 
-Then run with:
+Then run the pipeline with:
 
 ``` bash
 bash bin/run_pipeline.sh --db-path /scratch/my_databases/uva_eskape_2026-01-23
@@ -90,7 +91,7 @@ bash bin/run_pipeline.sh --db-path /scratch/my_databases/uva_eskape_2026-01-23
 
 ------------------------------------------------------------------------
 
-## 3️⃣ Configure Environment
+## 3️⃣ Configure environment
 
 Edit:
 
@@ -107,25 +108,36 @@ OUTDIR=
 MODE=modules
 ```
 
-### Required Tools
-
--   Mash 2.3
--   TrimGalore
--   Trimmomatic 0.39
--   Java
--   Snippy
--   snp-sites
--   snp-dists
+```{=html}
+<details>
+```
+```{=html}
+<summary>
+```
+🔧 Required tools
+```{=html}
+</summary>
+```
+-   Mash 2.3\
+-   TrimGalore\
+-   Trimmomatic 0.39\
+-   Java\
+-   Snippy\
+-   snp-sites\
+-   snp-dists\
 -   Python 3
 
-> ⚠️ This pipeline currently runs in **modules-only mode** (no
-> containers).
+> Note: this version is **modules-only** (no containers).
+
+```{=html}
+</details>
+```
 
 ------------------------------------------------------------------------
 
-# 📄 Samplesheet Format
+# 📄 Samplesheet format
 
-CSV format:
+CSV header:
 
     sample,fastq_1,fastq_2
 
@@ -134,7 +146,7 @@ Example:
     ISO1,/path/to/ISO1_R1.fastq.gz,/path/to/ISO1_R2.fastq.gz
     ISO2,/path/to/ISO2_R1.fastq.gz,/path/to/ISO2_R2.fastq.gz
 
-Absolute FASTQ paths are required.
+Absolute paths to FASTQ files are required.
 
 ------------------------------------------------------------------------
 
@@ -174,7 +186,7 @@ bash bin/run_pipeline.sh \
 
 ------------------------------------------------------------------------
 
-# 🔬 Pipeline Workflow
+# 🔬 Pipeline workflow
 
 ```{=html}
 <details>
@@ -182,7 +194,7 @@ bash bin/run_pipeline.sh \
 ```{=html}
 <summary>
 ```
-`<strong>`{=html}Step 1 --- QC`</strong>`{=html}
+Step 1 --- QC
 ```{=html}
 </summary>
 ```
@@ -202,7 +214,7 @@ Output:
 ```{=html}
 <summary>
 ```
-`<strong>`{=html}Step 2 --- Mash Speciation`</strong>`{=html}
+Step 2 --- Mash speciation
 ```{=html}
 </summary>
 ```
@@ -214,9 +226,9 @@ Output:
 
     OUTDIR/mash/<sample>/
 
-Primary species result:
+Primary speciation output:
 
-    <sample>.mash-screen.top3_hits.txt
+    OUTDIR/mash/<sample>/<sample>.mash-screen.top3_hits.txt
 
 ```{=html}
 </details>
@@ -227,8 +239,7 @@ Primary species result:
 ```{=html}
 <summary>
 ```
-`<strong>`{=html}Round 1 --- SNV Calling (All
-Isolates)`</strong>`{=html}
+Round 1 --- SNV calling (all isolates)
 ```{=html}
 </summary>
 ```
@@ -238,7 +249,13 @@ Outputs:
 
     OUTDIR/variant_calling_round1/
 
-Includes: - core.aln - core.snp-dists.txt - initial_groups.tsv
+Includes:
+
+-   core.aln\
+-   core.full.aln\
+-   core.snp-dists.txt\
+-   initial_groups.tsv
+
 ```{=html}
 </details>
 ```
@@ -248,7 +265,7 @@ Includes: - core.aln - core.snp-dists.txt - initial_groups.tsv
 ```{=html}
 <summary>
 ```
-`<strong>`{=html}Round 2 --- Within-Group SNV Calling`</strong>`{=html}
+Round 2 --- within-group SNV calling
 ```{=html}
 </summary>
 ```
@@ -258,16 +275,21 @@ Outputs:
 
     OUTDIR/variant_calling_round2/groups/GroupX/
 
-Includes: - group-specific ref.fa - core.aln - GroupX.final_groups.tsv
+Includes:
+
+-   group-specific ref.fa\
+-   core.aln\
+-   GroupX.final_groups.tsv
+
 ```{=html}
 </details>
 ```
 
 ------------------------------------------------------------------------
 
-# 📊 Key Outputs
+# 📊 Key outputs
 
-## ✅ Final Deliverable
+## ✅ Final deliverable
 
     OUTDIR/final_output/final_groups_all.tsv
 
@@ -280,7 +302,7 @@ Columns:
 
 ------------------------------------------------------------------------
 
-## 📈 SNP Distance Matrices
+## 📈 SNP distance matrices
 
 Round 1:
 
@@ -296,7 +318,7 @@ Copies are also placed in:
 
 ------------------------------------------------------------------------
 
-# 📁 Output Directory Structure
+# 📁 Output directory structure
 
     OUTDIR/
     ├── qc/
