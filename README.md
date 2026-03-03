@@ -5,32 +5,32 @@ A SLURM-based whole genome SNV analysis pipeline for bacterial isolates\
 
 ------------------------------------------------------------------------
 
-## 🚀 Overview
+##  Overview
 
 This pipeline performs:
 
--   Read QC and trimming\
--   Mash-based speciation (per isolate)\
--   **Two rounds of reference-guided SNV calling (Snippy)**\
--   SNP-based clustering with species annotation\
+-   Read QC and trimming
+-   Mash-based speciation (per isolate)
+-   **Two rounds of reference-guided SNV calling (Snippy)**
+-   SNP-based clustering with species annotation
 -   Final consolidated grouping table for reporting
 
 ------------------------------------------------------------------------
 
-```
-🧠 Why two rounds of variant calling?
-```
+
+** Why two rounds of variant calling?**
+
 Using a single shared reference for a diverse set of isolates can
 inflate SNP distances when distant isolates are included (mapping and
 variant calling become less comparable across the cohort).
 
 To reduce this effect, the pipeline runs:
 
-1.  **Round 1** --- SNV calling across all isolates\
+1.  **Round 1** --- SNV calling across all isolates
 2.  **Initial clustering (default: 200 SNP)** --- define broad
-    relatedness groups\
+    relatedness groups
 3.  **Round 2** --- re-select a reference per group and re-run SNV
-    calling\
+    calling
 4.  **Final clustering (default: 50 SNP)** --- within-group resolution
 
 Singleton/unrelated isolates are carried forward but are not reprocessed
