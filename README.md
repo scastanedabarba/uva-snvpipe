@@ -1,364 +1,316 @@
-# UVA SNV Pipeline
+# 🧬 UVA SNV Pipeline
 
-A SLURM-based whole genome SNV analysis pipeline for bacterial isolates (tested on UVA Rivanna).
+A SLURM-based whole genome SNV analysis pipeline for bacterial isolates\
+(Tested on UVA Rivanna HPC)
+
+------------------------------------------------------------------------
+
+## 🚀 Overview
 
 This pipeline performs:
 
-- Read QC and trimming
-- Mash-based speciation (per isolate)
-- Two rounds of reference-guided SNV calling (Snippy)
-- SNP-based clustering with species annotation
+-   Read QC and trimming
+-   Mash-based speciation
+-   **Two rounds of reference-guided SNV calling (Snippy)**
+-   SNP-based clustering with species annotation
+-   Final consolidated grouping table for reporting
 
-## Why two rounds of variant calling?
+------------------------------------------------------------------------
 
-Using a **single, shared reference** for a mixed set of isolates can inflate SNP distances when one or more isolates are very distant (mapping/variant calling becomes less comparable across the cohort).
+```{=html}
+<details>
+```
+```{=html}
+<summary>
+```
+`<strong>`{=html}🧠 Why Two Rounds of Variant Calling?`</strong>`{=html}
+```{=html}
+</summary>
+```
+Using a single shared reference for a diverse set of isolates can
+inflate SNP distances when distant isolates are included.
 
-To reduce this effect, the pipeline runs:
+To improve clustering resolution:
 
-1. **Variant calling Round 1**: call SNPs across all isolates and compute a distance matrix.
-2. **Initial clustering (threshold = 200 SNP)**: define *broad* relatedness groups.
-3. **Variant calling Round 2 (within each broad group)**: re-select a reference *per group*, re-run Snippy and snippy-core, then compute **final** SNP distances and clusters within each group. The default threshold for final SNP clustering can be specified by the user, 50 is set as the default.
+1.  **Round 1** --- SNV calling across all isolates\
+2.  **Initial clustering (default: 200 SNP)** --- define broad
+    relatedness groups\
+3.  **Round 2** --- Re-select a reference per group and re-run SNV
+    calling\
+4.  **Final clustering (default: 50 SNP)** --- within-group resolution
 
-Singletons / unrelated isolates (no links under the Round 1 threshold) are carried through as **Unrelated** and are not re-run in Round 2.
+Singleton/unrelated isolates are carried forward but not reprocessed in
+Round 2.
 
----
+```{=html}
+</details>
+```
 
-# Installation
+------------------------------------------------------------------------
 
-## 1. Clone the repository
+# 📦 Installation
 
-```bash
+## 1️⃣ Clone the repository
+
+``` bash
 git clone https://github.com/scastanedabarba/uva-snvpipe.git
 cd uva-snvpipe
 ```
 
-## 2. Configure environment
+------------------------------------------------------------------------
 
-This pipeline runs using HPC modules and a conda environment.
+## 2️⃣ Download the Reference Database (Required)
 
-Required tools:
+The pipeline requires the **UVA ESKAPE reference database**.
 
-- Mash 2.3
-- TrimGalore
-- Trimmomatic 0.39
-- Java
-- Snippy
-- snp-sites
-- snp-dists
-- Python 3
+**Zenodo DOI:**\
+`10.5281/zenodo.18838576`
+
+### Install to default location (recommended)
+
+``` bash
+bash scripts/download_db.sh
+```
+
+Installs to:
+
+    databases/uva_eskape_2026-01-23/
+
+### Install to a custom location
+
+``` bash
+bash scripts/download_db.sh --output /scratch/my_databases
+```
+
+Then run with:
+
+``` bash
+bash bin/run_pipeline.sh --db-path /scratch/my_databases/uva_eskape_2026-01-23
+```
+
+------------------------------------------------------------------------
+
+## 3️⃣ Configure Environment
 
 Edit:
 
-```bash
+``` bash
 config/config.sh
 ```
 
-Important variables:
+Set:
 
-```bash
+``` bash
 ACCOUNT=
 PARTITION=
 OUTDIR=
-MASH_DB=/path/to/pathogen_refseq.chrom.k21s50000.msh
 MODE=modules
 ```
 
-> Note: This version is **modules-only** (no containers).
+### Required Tools
 
----
+-   Mash 2.3
+-   TrimGalore
+-   Trimmomatic 0.39
+-   Java
+-   Snippy
+-   snp-sites
+-   snp-dists
+-   Python 3
 
-# Samplesheet Format
+> ⚠️ This pipeline currently runs in **modules-only mode** (no
+> containers).
 
-CSV header:
+------------------------------------------------------------------------
 
-```
-sample,fastq_1,fastq_2
-```
+# 📄 Samplesheet Format
+
+CSV format:
+
+    sample,fastq_1,fastq_2
 
 Example:
 
-```
-PGCoE1,/scratch/reads/PGCoE1_R1.fastq.gz,/scratch/reads/PGCoE1_R2.fastq.gz
-PGCoE2,/scratch/reads/PGCoE2_R1.fastq.gz,/scratch/reads/PGCoE2_R2.fastq.gz
-```
+    ISO1,/path/to/ISO1_R1.fastq.gz,/path/to/ISO1_R2.fastq.gz
+    ISO2,/path/to/ISO2_R1.fastq.gz,/path/to/ISO2_R2.fastq.gz
 
-Absolute paths to FASTQ files are required.
+Absolute FASTQ paths are required.
 
----
+------------------------------------------------------------------------
 
-# Usage
+# ▶️ Usage
 
-## Run with defaults from config.sh
+## Run with defaults
 
-```bash
+``` bash
 bash bin/run_pipeline.sh
 ```
 
-## Specify a samplesheet
+## Specify samplesheet
 
-```bash
+``` bash
 bash bin/run_pipeline.sh --samplesheet config/samplesheet.csv
 ```
 
-## Specify an output directory
+## Specify output directory
 
-```bash
-bash bin/run_pipeline.sh --samplesheet config/samplesheet.csv --outdir /scratch/sgj4qr/snv_pipeline/test_run
+``` bash
+bash bin/run_pipeline.sh --outdir /scratch/my_run
 ```
 
-If `--outdir` is provided, it overrides `OUTDIR` in `config.sh`.
+## Specify database location
 
+``` bash
+bash bin/run_pipeline.sh --db-path /scratch/my_databases/uva_eskape_2026-01-23
+```
 
-## Specify thresholds for clustering in each round of varint calling (step 5 and 8)
+## Adjust clustering thresholds
 
-```bash
-bash bin/run_pipeline.sh --samplesheet config/samplesheet.csv --outdir /scratch/sgj4qr/snv_pipeline/test_run 
-  --round1-threshold 200 
+``` bash
+bash bin/run_pipeline.sh \
+  --round1-threshold 200 \
   --round2-threshold 50
 ```
 
----
+------------------------------------------------------------------------
 
-# Pipeline Workflow (high level)
+# 🔬 Pipeline Workflow
 
-## Step 1 — QC
-
-- TrimGalore
-- Trimmomatic
-- Produces trimmed paired FASTQs
+```{=html}
+<details>
+```
+```{=html}
+<summary>
+```
+`<strong>`{=html}Step 1 --- QC`</strong>`{=html}
+```{=html}
+</summary>
+```
+-   TrimGalore\
+-   Trimmomatic
 
 Output:
 
-```
-OUTDIR/qc/<sample>/
-```
+    OUTDIR/qc/<sample>/
 
-## Step 2 — Mash speciation (per isolate)
-
-- Concatenates trimmed reads
-- `mash sketch`, `mash dist`, `mash screen`
-- Writes top hits
+```{=html}
+</details>
+```
+```{=html}
+<details>
+```
+```{=html}
+<summary>
+```
+`<strong>`{=html}Step 2 --- Mash Speciation`</strong>`{=html}
+```{=html}
+</summary>
+```
+-   mash sketch\
+-   mash dist\
+-   mash screen
 
 Output:
 
+    OUTDIR/mash/<sample>/
+
+Primary species result:
+
+    <sample>.mash-screen.top3_hits.txt
+
+```{=html}
+</details>
 ```
-OUTDIR/mash/<sample>/
+```{=html}
+<details>
 ```
-
-### Where speciation results are stored
-
-Primary speciation source (top hit):
-
+```{=html}
+<summary>
 ```
-OUTDIR/mash/<sample>/<sample>.mash-screen.top3_hits.txt
+`<strong>`{=html}Round 1 --- SNV Calling (All
+Isolates)`</strong>`{=html}
+```{=html}
+</summary>
 ```
+Reference selected to minimize Mash triangle distance.
 
-Fallback:
+Outputs:
 
+    OUTDIR/variant_calling_round1/
+
+Includes: - core.aln - core.snp-dists.txt - initial_groups.tsv
+```{=html}
+</details>
 ```
-OUTDIR/mash/<sample>/<sample>.mash-ref.txt
+```{=html}
+<details>
 ```
-
-The clustering script reduces the Mash description to **Genus species** (first two words).
-
----
-
-## Variant calling Round 1 (all isolates)
-
-### Step 3 — Reference selection (Round 1)
-
-Selects a cohort reference that minimizes total Mash triangle distance across isolates.
-
-Output:
-
+```{=html}
+<summary>
 ```
-OUTDIR/variant_calling_round1/findref/ref.fa
+`<strong>`{=html}Round 2 --- Within-Group SNV Calling`</strong>`{=html}
+```{=html}
+</summary>
 ```
+Runs only for groups with ≥ 2 isolates.
 
-### Step 4 — SNV calling (Round 1)
+Outputs:
 
-Runs Snippy per isolate using the Round 1 reference.
+    OUTDIR/variant_calling_round2/groups/GroupX/
 
-Output:
-
-```
-OUTDIR/variant_calling_round1/snippy/<sample>/
-```
-
-### Step 5 — Core genome + initial clustering (Round 1)
-
-Runs:
-
-- `snippy-core`
-- `snp-sites`
-- `snp-dists`
-- **Initial clustering using threshold = 200 SNP**
-
-Core artifacts (Round 1):
-
-```
-OUTDIR/variant_calling_round1/snippy/core.aln
-OUTDIR/variant_calling_round1/snippy/core.full.aln
-OUTDIR/variant_calling_round1/snippy/phylo.aln
-OUTDIR/variant_calling_round1/snippy/snippy_core.log
+Includes: - group-specific ref.fa - core.aln - GroupX.final_groups.tsv
+```{=html}
+</details>
 ```
 
-Round 1 SNP matrix + initial groups:
+------------------------------------------------------------------------
 
-```
-OUTDIR/variant_calling_round1/summary/core.snp-dists.txt
-OUTDIR/variant_calling_round1/summary/initial_groups.tsv
-```
+# 📊 Key Outputs
 
----
+## ✅ Final Deliverable
 
-## Variant calling Round 2 (within initial groups)
+    OUTDIR/final_output/final_groups_all.tsv
 
-Round 2 only runs for initial groups with **≥ 2 isolates**. Singletons/unrelated isolates are not reprocessed.
+Columns:
 
-### Step 6 — Reference selection (Round 2, per group)
+-   Isolate\
+-   Species\
+-   Primary_Group (Round 1)\
+-   Secondary_Group (Round 2)
 
-Creates a Round 2 manifest and chooses a reference **per initial group**.
+------------------------------------------------------------------------
 
-Manifest:
+## 📈 SNP Distance Matrices
 
-```
-OUTDIR/variant_calling_round2/manifest/groups.tsv
-OUTDIR/variant_calling_round2/manifest/group_members/GroupX.samples.txt
-OUTDIR/variant_calling_round2/manifest/singletons.tsv
-```
+Round 1:
 
-Per-group reference:
+    variant_calling_round1/summary/core.snp-dists.txt
 
-```
-OUTDIR/variant_calling_round2/groups/GroupX/findref/ref.fa
-```
+Round 2:
 
-### Step 7 — SNV calling (Round 2, per group)
+    variant_calling_round2/summary/GroupX.core.snp-dists.txt
 
-Runs Snippy for group members using that group’s reference.
+Copies are also placed in:
 
-Per-group outputs:
+    OUTDIR/final_output/
 
-```
-OUTDIR/variant_calling_round2/groups/GroupX/snippy/<sample>/
-```
+------------------------------------------------------------------------
 
-### Step 8 — Core genome + final clustering (Round 2, per group)
+# 📁 Output Directory Structure
 
-Runs snippy-core per group and clusters **within-group** at **threshold = 50 SNP**.
+    OUTDIR/
+    ├── qc/
+    ├── mash/
+    ├── variant_calling_round1/
+    ├── variant_calling_round2/
+    ├── final_output/
+    └── slurm_logs/
 
-Core artifacts (Round 2 are stored *within the group snippy directory* to match Round 1 layout):
+------------------------------------------------------------------------
 
-```
-OUTDIR/variant_calling_round2/groups/GroupX/snippy/core.aln
-OUTDIR/variant_calling_round2/groups/GroupX/snippy/core.full.aln
-OUTDIR/variant_calling_round2/groups/GroupX/snippy/phylo.aln
-OUTDIR/variant_calling_round2/groups/GroupX/snippy/snippy_core.log
-```
+# 🏷 Version
 
-Round 2 SNP matrices + final group tables are written centrally:
-
-```
-OUTDIR/variant_calling_round2/summary/GroupX.core.snp-dists.txt
-OUTDIR/variant_calling_round2/summary/GroupX.final_groups.tsv
-```
-
----
-
-# Key Outputs to use
-
-## 1) Final table (recommended starting point)
-
-**This is the main deliverable**: isolates with species + final grouping.
-
-```
-OUTDIR/final_output/final_groups_all.tsv
-```
-
-It includes:
-
-- `Isolate`
-- `Species` (Genus species)
-- `Primary_Group` (Round 1 broad group; threshold 200)
-- `Secondary_Group` (Round 2 within-group cluster; threshold 50; `Unrelated` if not reprocessed)
-
-## 2) SNP distance matrices (variant matrices)
-
-- Round 1 matrix (all isolates):
-
-```
-OUTDIR/variant_calling_round1/summary/core.snp-dists.txt
-```
-
-- Round 2 matrices (per initial group):
-
-```
-OUTDIR/variant_calling_round2/summary/GroupX.core.snp-dists.txt
-```
-
-The pipeline also copies Round 2 matrices into:
-
-```
-OUTDIR/final_output/GroupX.core.snp-dists.txt
-```
-
----
-
-# Output Directory Structure
-
-```
-OUTDIR/
-├── qc/
-├── mash/
-├── variant_calling_round1/
-│   ├── findref/
-│   ├── snippy/
-│   │   ├── core.aln
-│   │   ├── core.full.aln
-│   │   ├── phylo.aln
-│   │   ├── snippy_core.log
-│   │   └── <sample>/
-│   ├── summary/
-│   │   ├── core.snp-dists.txt
-│   │   └── initial_groups.tsv
-│   └── status/
-│
-├── variant_calling_round2/
-│   ├── manifest/
-│   │   ├── groups.tsv
-│   │   ├── group_members/
-│   │   └── singletons.tsv
-│   ├── groups/
-│   │   └── GroupX/
-│   │       ├── samplesheet.csv
-│   │       ├── findref/
-│   │       └── snippy/
-│   │           ├── core.aln
-│   │           ├── core.full.aln
-│   │           ├── phylo.aln
-│   │           ├── snippy_core.log
-│   │           └── <sample>/
-│   └── summary/
-│       ├── Group1.core.snp-dists.txt
-│       ├── Group1.final_groups.tsv
-│       ├── Group2.core.snp-dists.txt
-│       ├── Group2.final_groups.tsv
-│       └── ...
-│
-├── final_output/
-│   ├── final_groups_all.tsv
-│   ├── Group1.core.snp-dists.txt
-│   ├── Group2.core.snp-dists.txt
-│   └── ...
-│
-└── slurm_logs/
-```
-
----
-
-# Version
-
-v0.2.0  
-Two-round SNV calling + grouping (200 SNP initial, 50 SNP final within-group), with user-friendly `final_output/`.
+**v0.2.0**\
+Two-round SNV calling with configurable thresholds and external database
+installation.
 
