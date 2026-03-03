@@ -4,12 +4,10 @@
 
 set -euo pipefail
 
-SAMPLESHEET="$1"
-OUTROOT="$2"
+SAMPLESHEET="$(readlink -f "$1")"
+OUTROOT="$(readlink -f "$2")"
 MODE="$3"
-
-# NEW: QCROOT is the directory that contains qc/<isolate>/... (default: parent of OUTROOT)
-QCROOT="${4:-$(dirname "$OUTROOT")}"
+QCROOT="$(readlink -f "${4:-$(dirname "$OUTROOT")}")"
 
 task_id="${SLURM_ARRAY_TASK_ID}"
 

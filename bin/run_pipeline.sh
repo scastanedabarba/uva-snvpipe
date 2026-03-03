@@ -11,6 +11,8 @@ USAGE:
 OPTIONS:
   --samplesheet FILE   Path to samplesheet CSV (default: config/samplesheet.csv)
   --outdir DIR         Output root directory (overrides config.sh OUTDIR)
+  --db-path DIR        Path to database root directory
+                       (default: <repo>/databases/uva_eskape_2026-01-23)
   --round1-threshold INT  SNP threshold for initial clustering (default: 200)
   --round2-threshold INT  SNP threshold for final clustering within groups (default: 50)
   -h, --help           Show this help message and exit
@@ -32,11 +34,13 @@ SAMPLESHEET=""
 USER_OUTDIR=""
 ROUND1_THRESHOLD="200"
 ROUND2_THRESHOLD="50"
+DB_PATH=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --samplesheet) SAMPLESHEET="$2"; shift 2 ;;
     --outdir)      USER_OUTDIR="$2"; shift 2 ;;
+    --db-path)     DB_PATH="$2"; shift 2 ;;
     --round1-threshold) ROUND1_THRESHOLD="$2"; shift 2 ;;
     --round2-threshold) ROUND2_THRESHOLD="$2"; shift 2 ;;
     -h|--help)     usage; exit 0 ;;
@@ -50,6 +54,20 @@ SCRIPTS_DIR="${REPO_DIR}/scripts"
 CONFIG_DIR="${REPO_DIR}/config"
 
 source "${CONFIG_DIR}/config.sh"
+
+DEFAULT_DB_PATH="${REPO_DIR}/databases/uva_eskape_2026-01-23"
+if [[ -z "${DB_PATH}" ]]; then
+  DB_PATH="$DEFAULT_DB_PATH"
+fi
+DB_PATH="$(readlink -f "$DB_PATH")"
+
+[[ -d "$DB_PATH" ]] || { echo "ERROR: db-path not found: $DB_PATH" >&2; exit 1; }
+[[ -f "$DB_PATH/mash/pathogen_refseq.chrom.k21s50000.msh" ]] || {
+  echo "ERROR: missing mash sketch: $DB_PATH/mash/pathogen_refseq.chrom.k21s50000.msh" >&2; exit 1; }
+[[ -f "$DB_PATH/mash/pathogen_refseq.chrom.mapping.txt" ]] || {
+  echo "ERROR: missing mash mapping: $DB_PATH/mash/pathogen_refseq.chrom.mapping.txt" >&2; exit 1; }
+[[ -d "$DB_PATH/chrom_fna" ]] || {
+  echo "ERROR: missing chrom_fna/: $DB_PATH/chrom_fna" >&2; exit 1; }
 
 OUTDIR_ROOT="$OUTDIR"
 if [[ -n "$USER_OUTDIR" ]]; then
@@ -99,6 +117,7 @@ PY
 
 echo "[pipeline] samplesheet=$SAMPLESHEET"
 echo "[pipeline] nsamples=$NSAMPLES"
+echo "[pipeline] db_path=$DB_PATH"
 echo "[pipeline] outdir_root=$OUTDIR_ROOT"
 echo "[pipeline] qc_dir=$QC_OUTDIR"
 echo "[pipeline] mash_dir=$MASH_OUTDIR"
@@ -131,7 +150,7 @@ MASH_JOBID=$(
     -J "mash" \
     -o "${LOGDIR}/step2_mash.%A_%a.out" -e "${LOGDIR}/step2_mash.%A_%a.err" \
     "${WORKFLOW_DIR}/step2_mash_array.slurm" \
-      "$SAMPLESHEET" "$OUTDIR_ROOT" "$MODE" "$MASH_DB"
+      "$SAMPLESHEET" "$OUTDIR_ROOT" "$MODE" "$DB_PATH"
 )
 echo "[submit] Step2 MASH job: $MASH_JOBID"
 
@@ -144,7 +163,7 @@ FINDREF_JOBID=$(
     -J "findref_r1" \
     -o "${LOGDIR}/step3_findref.%j.out" -e "${LOGDIR}/step3_findref.%j.err" \
     "${WORKFLOW_DIR}/step3_findref.slurm" \
-      "$SAMPLESHEET" "$VC1_OUTDIR" "${SCRIPTS_DIR}/parse_mash_triangle.v2.py"
+      "$SAMPLESHEET" "$VC1_OUTDIR" "${SCRIPTS_DIR}/parse_mash_triangle.v2.py" "$DB_PATH" "$OUTDIR_ROOT"
 )
 echo "[submit] Step3 FINDREF job: $FINDREF_JOBID"
 
@@ -185,7 +204,7 @@ R2_FINDREF_JOBID=$(
     -o "${LOGDIR}/step6_r2_findref.%j.out" -e "${LOGDIR}/step6_r2_findref.%j.err" \
     "${WORKFLOW_DIR}/step6_round2_findref.slurm" \
       "$SAMPLESHEET" "$OUTDIR_ROOT" "$VC1_OUTDIR" "$VC2_OUTDIR" \
-      "${SCRIPTS_DIR}/parse_mash_triangle.v2.py"
+      "${SCRIPTS_DIR}/parse_mash_triangle.v2.py" "$DB_PATH"
 )
 echo "[submit] Step6 ROUND2 FINDREF job: $R2_FINDREF_JOBID"
 

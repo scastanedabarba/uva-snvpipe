@@ -6,17 +6,21 @@ set -euo pipefail
 
 SAMPLESHEET="$(readlink -f "$1")"
 OUTDIR_ROOT="$(readlink -f "$2")"
-ROUND1_OUTDIR="$(readlink -f "$3")"   # now variant_calling_round1
-ROUND2_OUTDIR="$(readlink -f "$4")"   # now variant_calling_round2
+ROUND1_OUTDIR="$(readlink -f "$3")"   # variant_calling_round1
+ROUND2_OUTDIR="$(readlink -f "$4")"   # variant_calling_round2
 PARSE_TRI="$(readlink -f "$5")"
+DB_PATH="$(readlink -f "$6")"
 
 INITIAL_GROUPS="${ROUND1_OUTDIR}/summary/initial_groups.tsv"
-MAP_TSV="/scratch/sgj4qr/snv_pipeline/snvdb_20260123/mash/pathogen_refseq.chrom.mapping.txt"
-CHROM_FNA_DIR="/scratch/sgj4qr/snv_pipeline/snvdb_20260123/chrom_fna/"
+
+# Database-derived paths
+MAP_TSV="${DB_PATH}/mash/pathogen_refseq.chrom.mapping.txt"   # validated (not otherwise used here)
+CHROM_FNA_DIR="${DB_PATH}/chrom_fna"
 
 [[ -f "$SAMPLESHEET" ]]    || { echo "ERROR: missing samplesheet: $SAMPLESHEET" >&2; exit 1; }
 [[ -s "$INITIAL_GROUPS" ]] || { echo "ERROR: missing initial_groups.tsv: $INITIAL_GROUPS" >&2; exit 1; }
 [[ -f "$PARSE_TRI" ]]      || { echo "ERROR: missing parse script: $PARSE_TRI" >&2; exit 1; }
+[[ -d "$DB_PATH" ]]        || { echo "ERROR: missing DB_PATH: $DB_PATH" >&2; exit 1; }
 [[ -s "$MAP_TSV" ]]        || { echo "ERROR: missing mapping file: $MAP_TSV" >&2; exit 1; }
 [[ -d "$CHROM_FNA_DIR" ]]  || { echo "ERROR: missing chrom_fna dir: $CHROM_FNA_DIR" >&2; exit 1; }
 
@@ -37,6 +41,8 @@ echo -e "GroupID\tn_members" > "$groups_tsv"
 echo -e "Isolate\tRound1Group" > "$singletons_tsv"
 echo -e "Isolate\tGroupID" > "$iso2grp_tsv"
 
+echo "[r2_step6] db_path=$DB_PATH"
+echo "[r2_step6] chrom_fna_dir=$CHROM_FNA_DIR"
 echo "[r2_step6] reading round1 initial groups: $INITIAL_GROUPS"
 echo "[r2_step6] writing manifest: $manifest_dir"
 
@@ -147,7 +153,7 @@ while read -r grp nmem; do
     [[ -n "$ref_seqid" ]] || { echo "ERROR: empty ref_seqid for $sid in $mash_ref" >&2; exit 1; }
 
     ref_accid="${ref_seqid%%|*}"
-    reffa="$(find "$CHROM_FNA_DIR" -maxdepth 1 -name "${ref_accid}*.fna" | head -n 1 || true)"
+    reffa="$(find "$CHROM_FNA_DIR" -maxdepth 1 -name "${ref_accid}"'_*_chrom.fna' | head -n 1 || true)"
     if [[ -z "$reffa" ]]; then
       echo "[r2_step6] WARN: no chrom_fna fasta found for ${ref_accid}; skipping"
       continue
@@ -170,7 +176,7 @@ while read -r grp nmem; do
   if [[ "$ref_label" == *.fna ]]; then
     ref_fa="${CHROM_FNA_DIR%/}/${ref_label}"
   else
-    ref_fa="$(find "$CHROM_FNA_DIR" -maxdepth 1 -name "${ref_label}*.fna" | head -n 1 || true)"
+    ref_fa="$(find "$CHROM_FNA_DIR" -maxdepth 1 -name "${ref_label}"'_*_chrom.fna' | head -n 1 || true)"
   fi
 
   [[ -s "$ref_fa" ]] || { echo "ERROR: could not locate fasta for ref_label=${ref_label} (grp=${grp})" >&2; exit 1; }

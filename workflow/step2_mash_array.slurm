@@ -4,10 +4,19 @@
 
 set -euo pipefail
 
-SAMPLESHEET="$1"
-OUTROOT="$2"   # now: OUTDIR_ROOT (top-level)
+SAMPLESHEET="$(readlink -f "$1")"
+OUTROOT="$(readlink -f "$2")"
 MODE="$3"
-MASHREF="$4"
+DB_PATH="$(readlink -f "$4")"
+
+[[ -d "$DB_PATH" ]] || { echo "ERROR: DB_PATH not found: $DB_PATH" >&2; exit 1; }
+[[ -d "$DB_PATH/mash" ]] || { echo "ERROR: DB_PATH missing mash/: $DB_PATH" >&2; exit 1; }
+
+MASHREF="${DB_PATH}/mash/pathogen_refseq.chrom.k21s50000.msh"
+MASHREFMAP="${DB_PATH}/mash/pathogen_refseq.chrom.mapping.txt"
+
+[[ -s "$MASHREF" ]] || { echo "ERROR: Missing MASHREF: $MASHREF" >&2; exit 1; }
+[[ -s "$MASHREFMAP" ]] || { echo "ERROR: Missing MASHREFMAP: $MASHREFMAP" >&2; exit 1; }
 
 task_id="${SLURM_ARRAY_TASK_ID}"
 
@@ -30,6 +39,7 @@ THREADS="${SLURM_CPUS_PER_TASK:-1}"
 
 echo "[mash] task=${task_id} sample=${ACCID}"
 echo "[mash] mode=${MODE}"
+echo "[mash] db_path=${DB_PATH}"
 echo "[mash] mash_ref=${MASHREF}"
 echo "[mash] threads=${THREADS}"
 
@@ -73,14 +83,8 @@ fi
 echo "[mash] R1FASTQ=${R1FASTQ}"
 echo "[mash] R2FASTQ=${R2FASTQ}"
 
-MASHREFMAP="$(dirname "$MASHREF")/pathogen_refseq.chrom.mapping.txt"
-if [[ ! -s "$MASHREFMAP" ]]; then
-  echo "ERROR: Missing MASHREFMAP: $MASHREFMAP" >&2
-  exit 1
-fi
-
 zcat "$R1FASTQ" "$R2FASTQ" | gzip -c > "${OUTDIR}/${ACCID}.reads.fq.gz"
-mash sketch -r -m 2 -k 21 -s 50000 "${OUTDIR}/${ACCID}.reads.fq.gz"
+mash sketch -p "${THREADS}" -r -m 2 -k 21 -s 50000 "${OUTDIR}/${ACCID}.reads.fq.gz"
 
 mash dist -p "${THREADS}" "${OUTDIR}/${ACCID}.reads.fq.gz.msh" "${MASHREF}" > "${OUTDIR}/${ACCID}.mash-dist.output.txt"
 

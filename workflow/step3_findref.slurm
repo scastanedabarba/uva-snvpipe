@@ -4,28 +4,28 @@
 
 set -euo pipefail
 
+# Args:
+#   1) samplesheet (CSV)
+#   2) OUTROOT    (VC1_OUTDIR; will contain findref/ outputs)
+#   3) parse_tri  (parse_mash_triangle.v2.py)
+#   4) DB_PATH    (database root; e.g., databases/uva_eskape_2026-01-23)
+#   5) MASHROOT   (pipeline OUTDIR_ROOT; contains mash/<sid>/ outputs from step2)
 SAMPLESHEET="$(readlink -f "$1")"
-OUTROOT="$2"
-PARSE_TRI="$3"
+OUTROOT="$(readlink -f "$2")"
+PARSE_TRI="$(readlink -f "$3")"
+DB_PATH="$(readlink -f "$4")"
+MASHROOT="$(readlink -f "$5")"
 
-# NEW: MASHROOT is the directory that contains mash/<isolate>/... (default: parent of OUTROOT)
-# Backward-compatible heuristic:
-#   - if $4 looks like a mapping file, treat it as MAP_TSV (old calling style)
-#   - otherwise treat $4 as MASHROOT
-ARG4="${4:-}"
-if [[ -n "$ARG4" && "$(basename "$ARG4")" == *mapping*.txt ]]; then
-  MASHROOT="$(readlink -f "$(dirname "$OUTROOT")")"
-  MAP_TSV="$(readlink -f "$ARG4")"
-  CHROM_FNA_DIR="${5:-/scratch/sgj4qr/snv_pipeline/snvdb_20260123/chrom_fna/}"
-else
-  MASHROOT="$(readlink -f "${ARG4:-$(dirname "$OUTROOT")}")"
-  MAP_TSV="${5:-/scratch/sgj4qr/snv_pipeline/snvdb_20260123/mash/pathogen_refseq.chrom.mapping.txt}"
-  CHROM_FNA_DIR="${6:-/scratch/sgj4qr/snv_pipeline/snvdb_20260123/chrom_fna/}"
-fi
+CHROM_FNA_DIR="${DB_PATH}/chrom_fna"
+MASHREFMAP="${DB_PATH}/mash/pathogen_refseq.chrom.mapping.txt"  # not currently used, but validated
 
-[[ -f "$MAP_TSV" ]]       || { echo "ERROR: missing mapping file: $MAP_TSV" >&2; exit 1; }
-[[ -d "$CHROM_FNA_DIR" ]] || { echo "ERROR: missing chrom_fna dir: $CHROM_FNA_DIR" >&2; exit 1; }
-[[ -f "$PARSE_TRI" ]]     || { echo "ERROR: missing parse script: $PARSE_TRI" >&2; exit 1; }
+[[ -f "$SAMPLESHEET" ]]    || { echo "ERROR: missing samplesheet: $SAMPLESHEET" >&2; exit 1; }
+[[ -d "$OUTROOT" ]]        || { echo "ERROR: missing OUTROOT: $OUTROOT" >&2; exit 1; }
+[[ -f "$PARSE_TRI" ]]      || { echo "ERROR: missing parse script: $PARSE_TRI" >&2; exit 1; }
+[[ -d "$DB_PATH" ]]        || { echo "ERROR: missing DB_PATH: $DB_PATH" >&2; exit 1; }
+[[ -d "$CHROM_FNA_DIR" ]]  || { echo "ERROR: missing chrom_fna dir: $CHROM_FNA_DIR" >&2; exit 1; }
+[[ -f "$MASHREFMAP" ]]     || { echo "ERROR: missing mapping file: $MASHREFMAP" >&2; exit 1; }
+[[ -d "$MASHROOT/mash" ]]  || { echo "ERROR: missing mash output dir: $MASHROOT/mash" >&2; exit 1; }
 
 module use /project/amr_services/modulefiles/
 module load mash/2.3
@@ -36,7 +36,7 @@ mkdir -p "$msh_dir"
 cd "$findref_dir"
 
 # Build a simple list of sample IDs from samplesheet.csv
-samples=($(python3 - <<'PY' "$SAMPLESHEET"
+mapfile -t samples < <(python3 - <<'PY' "$SAMPLESHEET"
 import csv, sys
 path=sys.argv[1]
 with open(path, newline='') as f:
@@ -44,9 +44,11 @@ with open(path, newline='') as f:
     rows=[row for row in r if any((v or "").strip() for v in row.values())]
 print("\n".join([row["sample"].strip() for row in rows]))
 PY
-))
+)
 
 echo "[findref] n_samples=${#samples[@]}"
+echo "[findref] db_path=${DB_PATH}"
+echo "[findref] chrom_fna_dir=${CHROM_FNA_DIR}"
 echo "[findref] mashroot=${MASHROOT}"
 echo "[findref] outroot=${OUTROOT}"
 echo "[findref] copying isolate sketches + sketching candidate refs"
@@ -69,7 +71,8 @@ for sid in "${samples[@]}"; do
   ref_accid="${ref_seqid%%|*}"
   [[ -n "$ref_accid" ]] || { echo "ERROR: could not parse ref_accid from ref_seqid=$ref_seqid (sample=$sid)" >&2; exit 1; }
 
-  reffa="$(find "$CHROM_FNA_DIR" -name "${ref_accid}*.fna" | head -n 1 || true)"
+  # Prefer your chrom_fna naming convention: <ACC>_*_chrom.fna
+  reffa="$(find "$CHROM_FNA_DIR" -maxdepth 1 -name "${ref_accid}"'_*_chrom.fna' | head -n 1 || true)"
   if [[ -z "${reffa}" ]]; then
     echo "WARN: No chrom_fna fasta found for ${ref_accid} (from ${ref_seqid}); skipping"
     continue
@@ -99,7 +102,7 @@ echo "$ref_label" > "${findref_dir}/ref_accid.txt"
 if [[ "$ref_label" == *.fna ]]; then
   ref_fa="${CHROM_FNA_DIR%/}/${ref_label}"
 else
-  ref_fa="$(find "$CHROM_FNA_DIR" -maxdepth 1 -name "${ref_label}*.fna" | head -n 1 || true)"
+  ref_fa="$(find "$CHROM_FNA_DIR" -maxdepth 1 -name "${ref_label}"'_*_chrom.fna' | head -n 1 || true)"
 fi
 
 [[ -s "$ref_fa" ]] || {
