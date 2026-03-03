@@ -17,15 +17,8 @@ This pipeline performs:
 
 ------------------------------------------------------------------------
 
-```{=html}
-<details>
-```
-```{=html}
-<summary>
 ```
 🧠 Why two rounds of variant calling?
-```{=html}
-</summary>
 ```
 Using a single shared reference for a diverse set of isolates can
 inflate SNP distances when distant isolates are included (mapping and
@@ -42,10 +35,6 @@ To reduce this effect, the pipeline runs:
 
 Singleton/unrelated isolates are carried forward but are not reprocessed
 in Round 2.
-
-```{=html}
-</details>
-```
 
 ------------------------------------------------------------------------
 
@@ -108,16 +97,7 @@ OUTDIR=
 MODE=modules
 ```
 
-```{=html}
-<details>
-```
-```{=html}
-<summary>
-```
 🔧 Required tools
-```{=html}
-</summary>
-```
 -   Mash 2.3\
 -   TrimGalore\
 -   Trimmomatic 0.39\
@@ -128,10 +108,6 @@ MODE=modules
 -   Python 3
 
 > Note: this version is **modules-only** (no containers).
-
-```{=html}
-</details>
-```
 
 ------------------------------------------------------------------------
 
@@ -188,12 +164,6 @@ bash bin/run_pipeline.sh \
 
 # 🔬 Pipeline workflow
 
-```{=html}
-<details>
-```
-```{=html}
-<summary>
-```
 Step 1 --- QC
 ```{=html}
 </summary>
@@ -205,19 +175,7 @@ Output:
 
     OUTDIR/qc/<sample>/
 
-```{=html}
-</details>
-```
-```{=html}
-<details>
-```
-```{=html}
-<summary>
-```
 Step 2 --- Mash speciation
-```{=html}
-</summary>
-```
 -   mash sketch\
 -   mash dist\
 -   mash screen
@@ -230,19 +188,8 @@ Primary speciation output:
 
     OUTDIR/mash/<sample>/<sample>.mash-screen.top3_hits.txt
 
-```{=html}
-</details>
-```
-```{=html}
-<details>
-```
-```{=html}
-<summary>
-```
 Round 1 --- SNV calling (all isolates)
-```{=html}
-</summary>
-```
+
 Reference selected to minimize Mash triangle distance.
 
 Outputs:
@@ -256,19 +203,8 @@ Includes:
 -   core.snp-dists.txt\
 -   initial_groups.tsv
 
-```{=html}
-</details>
-```
-```{=html}
-<details>
-```
-```{=html}
-<summary>
-```
 Round 2 --- within-group SNV calling
-```{=html}
-</summary>
-```
+
 Runs only for groups with ≥ 2 isolates.
 
 Outputs:
@@ -281,9 +217,6 @@ Includes:
 -   core.aln\
 -   GroupX.final_groups.tsv
 
-```{=html}
-</details>
-```
 
 ------------------------------------------------------------------------
 
