@@ -18,7 +18,7 @@ This pipeline performs:
 ------------------------------------------------------------------------
 
 
-** Why two rounds of variant calling?**
+**Why two rounds of variant calling?**
 
 Using a single shared reference for a diverse set of isolates can
 inflate SNP distances when distant isolates are included (mapping and
@@ -98,13 +98,13 @@ MODE=modules
 ```
 
 🔧 Required tools
--   Mash 2.3\
--   TrimGalore\
--   Trimmomatic 0.39\
--   Java\
--   Snippy\
--   snp-sites\
--   snp-dists\
+-   Mash 2.3
+-   TrimGalore
+-   Trimmomatic 0.39
+-   Java
+-   Snippy
+-   snp-sites
+-   snp-dists
 -   Python 3
 
 > Note: this version is **modules-only** (no containers).
@@ -155,9 +155,7 @@ bash bin/run_pipeline.sh --db-path /scratch/my_databases/uva_eskape_2026-01-23
 ## Adjust clustering thresholds
 
 ``` bash
-bash bin/run_pipeline.sh \
-  --round1-threshold 200 \
-  --round2-threshold 50
+bash bin/run_pipeline.sh --round1-threshold 200 --round2-threshold 50
 ```
 
 ------------------------------------------------------------------------
@@ -165,10 +163,7 @@ bash bin/run_pipeline.sh \
 # 🔬 Pipeline workflow
 
 Step 1 --- QC
-```{=html}
-</summary>
-```
--   TrimGalore\
+-   TrimGalore
 -   Trimmomatic
 
 Output:
@@ -176,8 +171,8 @@ Output:
     OUTDIR/qc/<sample>/
 
 Step 2 --- Mash speciation
--   mash sketch\
--   mash dist\
+-   mash sketch
+-   mash dist
 -   mash screen
 
 Output:
@@ -198,9 +193,9 @@ Outputs:
 
 Includes:
 
--   core.aln\
--   core.full.aln\
--   core.snp-dists.txt\
+-   core.aln
+-   core.full.aln
+-   core.snp-dists.txt
 -   initial_groups.tsv
 
 Round 2 --- within-group SNV calling
@@ -213,8 +208,8 @@ Outputs:
 
 Includes:
 
--   group-specific ref.fa\
--   core.aln\
+-   group-specific ref.fa
+-   core.aln
 -   GroupX.final_groups.tsv
 
 
@@ -228,9 +223,9 @@ Includes:
 
 Columns:
 
--   Isolate\
--   Species\
--   Primary_Group (Round 1)\
+-   Isolate
+-   Species
+-   Primary_Group (Round 1)
 -   Secondary_Group (Round 2)
 
 ------------------------------------------------------------------------
