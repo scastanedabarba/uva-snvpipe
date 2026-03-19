@@ -38,7 +38,7 @@ in Round 2.
 
 ------------------------------------------------------------------------
 
-# 📦 Installation
+# Installation
 
 ## 1️⃣ Clone the repository
 
@@ -111,7 +111,7 @@ MODE=modules
 
 ------------------------------------------------------------------------
 
-# 📄 Samplesheet format
+# Samplesheet format
 
 CSV header:
 
@@ -137,7 +137,7 @@ bash bin/run_pipeline.sh
 ## Specify samplesheet
 
 ``` bash
-bash bin/run_pipeline.sh --samplesheet config/samplesheet.csv
+bash bin/run_pipeline.sh --samplesheet samplesheet.csv
 ```
 
 ## Specify output directory
@@ -160,7 +160,7 @@ bash bin/run_pipeline.sh --round1-threshold 200 --round2-threshold 50
 
 ------------------------------------------------------------------------
 
-# 🔬 Pipeline workflow
+# Pipeline workflow
 
 Step 1 --- QC
 -   TrimGalore
@@ -215,9 +215,9 @@ Includes:
 
 ------------------------------------------------------------------------
 
-# 📊 Key outputs
+# Key outputs
 
-## ✅ Final deliverable
+## Final deliverable
 
     OUTDIR/final_output/final_groups_all.tsv
 
@@ -230,7 +230,7 @@ Columns:
 
 ------------------------------------------------------------------------
 
-## 📈 SNP distance matrices
+## SNP distance matrices
 
 Round 1:
 
@@ -246,7 +246,7 @@ Copies are also placed in:
 
 ------------------------------------------------------------------------
 
-# 📁 Output directory structure
+# Output directory structure
 
     OUTDIR/
     ├── qc/
@@ -258,7 +258,7 @@ Copies are also placed in:
 
 ------------------------------------------------------------------------
 
-# 🏷 Version
+# Version
 
 **v0.2.0**\
 Two-round SNV calling with configurable thresholds and external database
