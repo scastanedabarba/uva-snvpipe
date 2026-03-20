@@ -7,16 +7,13 @@ set -euo pipefail
 SAMPLESHEET="$(readlink -f "$1")"
 OUTROOT="$(readlink -f "$2")"
 MODE="$3"
-DB_PATH="$(readlink -f "$4")"
+MASHREF="$(readlink -f "$4")"
+MASHREFMAP="$(readlink -f "$5")"
 
-[[ -d "$DB_PATH" ]] || { echo "ERROR: DB_PATH not found: $DB_PATH" >&2; exit 1; }
-[[ -d "$DB_PATH/mash" ]] || { echo "ERROR: DB_PATH missing mash/: $DB_PATH" >&2; exit 1; }
-
-MASHREF="${DB_PATH}/mash/pathogen_refseq.chrom.k21s50000.msh"
-MASHREFMAP="${DB_PATH}/mash/pathogen_refseq.chrom.mapping.txt"
-
-[[ -s "$MASHREF" ]] || { echo "ERROR: Missing MASHREF: $MASHREF" >&2; exit 1; }
-[[ -s "$MASHREFMAP" ]] || { echo "ERROR: Missing MASHREFMAP: $MASHREFMAP" >&2; exit 1; }
+[[ -f "$SAMPLESHEET" ]] || { echo "ERROR: SAMPLESHEET not found: $SAMPLESHEET" >&2; exit 1; }
+[[ -d "$OUTROOT" ]] || { echo "ERROR: OUTROOT not found: $OUTROOT" >&2; exit 1; }
+[[ -s "$MASHREF" ]] || { echo "ERROR: MASH sketch not found: $MASHREF" >&2; exit 1; }
+[[ -s "$MASHREFMAP" ]] || { echo "ERROR: MASH mapping not found: $MASHREFMAP" >&2; exit 1; }
 
 task_id="${SLURM_ARRAY_TASK_ID}"
 
@@ -29,8 +26,8 @@ with open(path, newline='') as f:
     rows=[row for row in r if any((v or "").strip() for v in row.values())]
 row=rows[idx-1]
 sid=row["sample"].strip()
-r1 =row["fastq_1"].strip()
-r2 =row["fastq_2"].strip()
+r1=row["fastq_1"].strip()
+r2=row["fastq_2"].strip()
 print(sid, r1, r2)
 PY
 )
@@ -39,8 +36,8 @@ THREADS="${SLURM_CPUS_PER_TASK:-1}"
 
 echo "[mash] task=${task_id} sample=${ACCID}"
 echo "[mash] mode=${MODE}"
-echo "[mash] db_path=${DB_PATH}"
 echo "[mash] mash_ref=${MASHREF}"
+echo "[mash] mash_mapping=${MASHREFMAP}"
 echo "[mash] threads=${THREADS}"
 
 qc_dir="${OUTROOT}/qc/${ACCID}"

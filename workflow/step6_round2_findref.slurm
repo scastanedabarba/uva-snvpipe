@@ -6,21 +6,17 @@ set -euo pipefail
 
 SAMPLESHEET="$(readlink -f "$1")"
 OUTDIR_ROOT="$(readlink -f "$2")"
-ROUND1_OUTDIR="$(readlink -f "$3")"   # variant_calling_round1
-ROUND2_OUTDIR="$(readlink -f "$4")"   # variant_calling_round2
+ROUND1_OUTDIR="$(readlink -f "$3")"
+ROUND2_OUTDIR="$(readlink -f "$4")"
 PARSE_TRI="$(readlink -f "$5")"
-DB_PATH="$(readlink -f "$6")"
+MAP_TSV="$(readlink -f "$6")"
+CHROM_FNA_DIR="$(readlink -f "$7")"
 
 INITIAL_GROUPS="${ROUND1_OUTDIR}/summary/initial_groups.tsv"
-
-# Database-derived paths
-MAP_TSV="${DB_PATH}/mash/pathogen_refseq.chrom.mapping.txt"   # validated (not otherwise used here)
-CHROM_FNA_DIR="${DB_PATH}/chrom_fna"
 
 [[ -f "$SAMPLESHEET" ]]    || { echo "ERROR: missing samplesheet: $SAMPLESHEET" >&2; exit 1; }
 [[ -s "$INITIAL_GROUPS" ]] || { echo "ERROR: missing initial_groups.tsv: $INITIAL_GROUPS" >&2; exit 1; }
 [[ -f "$PARSE_TRI" ]]      || { echo "ERROR: missing parse script: $PARSE_TRI" >&2; exit 1; }
-[[ -d "$DB_PATH" ]]        || { echo "ERROR: missing DB_PATH: $DB_PATH" >&2; exit 1; }
 [[ -s "$MAP_TSV" ]]        || { echo "ERROR: missing mapping file: $MAP_TSV" >&2; exit 1; }
 [[ -d "$CHROM_FNA_DIR" ]]  || { echo "ERROR: missing chrom_fna dir: $CHROM_FNA_DIR" >&2; exit 1; }
 
@@ -41,7 +37,7 @@ echo -e "GroupID\tn_members" > "$groups_tsv"
 echo -e "Isolate\tRound1Group" > "$singletons_tsv"
 echo -e "Isolate\tGroupID" > "$iso2grp_tsv"
 
-echo "[r2_step6] db_path=$DB_PATH"
+echo "[r2_step6] mash_mapping=$MAP_TSV"
 echo "[r2_step6] chrom_fna_dir=$CHROM_FNA_DIR"
 echo "[r2_step6] reading round1 initial groups: $INITIAL_GROUPS"
 echo "[r2_step6] writing manifest: $manifest_dir"
@@ -87,7 +83,6 @@ with open(singletons_tsv, "a") as out:
         if grp == "Unrelated" or len(groups[grp]) < 2:
             out.write(f"{iso}\t{grp}\n")
 
-# isolate->kept group map (for step7 fast lookup)
 with open(iso2grp_tsv, "a") as out:
     for grp, _n in kept:
         for iso in sorted(groups[grp]):
@@ -137,14 +132,12 @@ while read -r grp nmem; do
 
   mapfile -t samples < "${members_dir}/${grp}.samples.txt"
 
-  # 1) copy isolate sketches from TOP-LEVEL mash
   for sid in "${samples[@]}"; do
     iso_msh="${OUTDIR_ROOT}/mash/${sid}/${sid}.reads.fq.gz.msh"
     [[ -s "$iso_msh" ]] || { echo "ERROR: missing isolate sketch for ${sid}: $iso_msh" >&2; exit 1; }
     cp -f "$iso_msh" "$gmsh/"
   done
 
-  # 2) sketch each member's top-hit reference (from TOP-LEVEL mash-ref)
   for sid in "${samples[@]}"; do
     mash_ref="${OUTDIR_ROOT}/mash/${sid}/${sid}.mash-ref.txt"
     [[ -s "$mash_ref" ]] || { echo "ERROR: missing mash-ref for ${sid}: $mash_ref" >&2; exit 1; }
