@@ -152,6 +152,24 @@ bash bin/run_pipeline.sh --outdir /scratch/my_run
 bash bin/run_pipeline.sh --db-path /scratch/my_databases/uva_eskape_2026-01-23
 ```
 
+## Specify custom database components
+
+The pipeline now supports fully custom databases as long as the following are provided:
+
+- Mash sketch (`.msh`)
+- Mash mapping file (`.mapping.txt`)
+- Reference FASTA directory
+
+``` bash
+bash bin/run_pipeline.sh 
+  --samplesheet samplesheet.csv 
+  --mash-sketch /path/to/db.msh 
+  --mash-mapping /path/to/db.mapping.txt 
+  --ref-dir /path/to/chrom_fna
+```
+
+You can also mix with `--db-path`, where explicit arguments override defaults.
+
 ## Adjust clustering thresholds
 
 ``` bash
