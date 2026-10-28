@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=snippy
-#SBATCH --export=NONE
+# Environment is exported explicitly by the launcher
 
 set -euo pipefail
+
+: "${PIPELINE_ROOT:?ERROR: PIPELINE_ROOT is not set}"
+SCRIPT_DIR="${PIPELINE_ROOT}/workflow"
+source "${SCRIPT_DIR}/../scripts/setup_env.sh"
 
 SAMPLESHEET="$(readlink -f "$1")"
 OUTROOT="$(readlink -f "$2")"
@@ -30,9 +34,9 @@ echo "[snippy] task=${task_id} sample=${sid}"
 echo "[snippy] outroot=${OUTROOT}"
 echo "[snippy] qcroot=${QCROOT}"
 
-# modules-only for now
-if [[ "$MODE" != "modules" ]]; then
-  echo "ERROR: MODE must be 'modules' (got: $MODE)" >&2
+# Conda mode
+if [[ "$MODE" != "conda" ]]; then
+  echo "ERROR: MODE must be conda (got: $MODE)" >&2
   exit 2
 fi
 
@@ -55,15 +59,9 @@ r2="${qc_dir}/${sid}_R2.trim.fq.gz"
 [[ -s "$r1" ]] || { echo "ERROR: missing QC R1: $r1" >&2; exit 1; }
 [[ -s "$r2" ]] || { echo "ERROR: missing QC R2: $r2" >&2; exit 1; }
 
-# Environment setup (Rivanna)
-module purge || true
-module load miniforge
-module load java
+# Environment provided by setup_env.sh
 
-# Activate Snippy env
-set +u
-source activate /project/amr_services/.conda/amrpipe-snippy-env
-set -u
+# Snippy is provided by CONDA_ENV
 
 command -v snippy >/dev/null 2>&1 || { echo "ERROR: snippy not found in PATH after env activation" >&2; exit 1; }
 command -v java   >/dev/null 2>&1 || { echo "ERROR: java not found in PATH" >&2; exit 1; }

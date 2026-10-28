@@ -1,35 +1,43 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=r2_core
-#SBATCH --export=NONE
+# Environment is exported explicitly by the launcher
 
 set -euo pipefail
+
+: "${PIPELINE_ROOT:?ERROR: PIPELINE_ROOT is not set}"
+SCRIPT_DIR="${PIPELINE_ROOT}/workflow"
+source "${SCRIPT_DIR}/../scripts/setup_env.sh"
 
 OUTDIR_ROOT="$(readlink -f "$1")"
 ROUND2_OUTDIR="$(readlink -f "$2")"
 FINAL_OUTDIR="$(readlink -f "$3")"
 CLUSTER_SCRIPT="$(readlink -f "$4")"
 THRESHOLD="${5:-50}"
+METRICS_SCRIPT="${PIPELINE_ROOT}/scripts/corealn_metrics.py"
 
 groups_tsv="${ROUND2_OUTDIR}/manifest/groups.tsv"
 singletons_tsv="${ROUND2_OUTDIR}/manifest/singletons.tsv"
 groups_dir="${ROUND2_OUTDIR}/groups"
 round2_summary="${ROUND2_OUTDIR}/summary"
+round1_summary="${OUTDIR_ROOT}/variant_calling_round1/summary"
+final_round1="${FINAL_OUTDIR}/round1"
+final_round2="${FINAL_OUTDIR}/round2"
 
 [[ -s "$groups_tsv" ]] || { echo "ERROR: missing groups.tsv: $groups_tsv" >&2; exit 1; }
 [[ -f "$CLUSTER_SCRIPT" ]] || { echo "ERROR: missing cluster script: $CLUSTER_SCRIPT" >&2; exit 1; }
+[[ -f "$METRICS_SCRIPT" ]] || { echo "ERROR: missing metrics script: $METRICS_SCRIPT" >&2; exit 1; }
 
-module load miniforge
-set +u
-source activate /project/amr_services/.conda/amrpipe-snippy-env
-set -u
-module use /project/amr_services/modulefiles/
-module load snp-dists || true
+mkdir -p "$FINAL_OUTDIR" "$round2_summary" "$final_round1" "$final_round2"
 
-mkdir -p "$FINAL_OUTDIR" "$round2_summary"
+# Preserve round-one matrix and callability report in the final deliverables.
+for report in core.snp-dists.txt core_alignment_metrics.tsv; do
+  [[ -s "${round1_summary}/${report}" ]] || { echo "ERROR: missing round1 report: ${round1_summary}/${report}" >&2; exit 1; }
+  cp -f "${round1_summary}/${report}" "${final_round1}/${report}"
+done
 
 echo "[r2_step8] per-group core + final clustering ..."
 while read -r grp nmem; do
-  [[ "$grp" == "GroupID" ]] && continue
+  [[ "$grp" == "GroupID" || -z "$grp" ]] && continue
 
   gdir="${groups_dir}/${grp}"
   ref_fa="${gdir}/findref/ref.fa"
@@ -37,8 +45,20 @@ while read -r grp nmem; do
 
   snippy_root="${gdir}/snippy"
   done_flag="${ROUND2_OUTDIR}/manifest/${grp}.core.done"
+  group_snp="${round2_summary}/${grp}.core.snp-dists.txt"
+  group_metrics="${round2_summary}/${grp}.core_alignment_metrics.tsv"
+  group_final="${round2_summary}/${grp}.final_groups.tsv"
+
   if [[ -f "$done_flag" ]]; then
     echo "[r2_step8] ${grp} core already done -> $done_flag"
+    # Backfill metrics for groups completed by an older version of the workflow.
+    if [[ ! -s "$group_metrics" ]]; then
+      [[ -s "${snippy_root}/core.full.aln" ]] || { echo "ERROR: missing core.full.aln for ${grp}" >&2; exit 1; }
+      python3 "$METRICS_SCRIPT" "${snippy_root}/core.full.aln" --output "$group_metrics"
+    fi
+    [[ -s "$group_snp" && -s "$group_final" ]] || { echo "ERROR: missing completed group reports for ${grp}" >&2; exit 1; }
+    cp -f "$group_snp" "$final_round2/$(basename "$group_snp")"
+    cp -f "$group_metrics" "$final_round2/$(basename "$group_metrics")"
     continue
   fi
 
@@ -47,26 +67,23 @@ while read -r grp nmem; do
 
   echo "[r2_step8] group=${grp} n=${nmem} dirs=${#dirs[@]}"
 
-  # run snippy-core in snippy_root so core.* lands there (matches round1 behavior)
   cd "$snippy_root"
   snippy-core --ref "$ref_fa" "${dirs[@]}" &> "${snippy_root}/snippy_core.log"
 
   snp-sites -b -c -o "${snippy_root}/phylo.aln" "${snippy_root}/core.full.aln"
 
-  # write centralized per-group SNP matrix
-  group_snp="${round2_summary}/${grp}.core.snp-dists.txt"
+  python3 "$METRICS_SCRIPT" "${snippy_root}/core.full.aln" --output "$group_metrics"
+
   snp-dists "${snippy_root}/core.aln" > "$group_snp"
 
-  # final clustering within group at 50 SNP
-  group_final="${round2_summary}/${grp}.final_groups.tsv"
   python3 "$CLUSTER_SCRIPT" \
     --snp-dists "$group_snp" \
     --outdir "$OUTDIR_ROOT" \
     --threshold "$THRESHOLD" \
     --output "$group_final"
 
-  # copy matrix to final_output for easy access
-  cp -f "$group_snp" "${FINAL_OUTDIR}/$(basename "$group_snp")"
+  cp -f "$group_snp" "$final_round2/$(basename "$group_snp")"
+  cp -f "$group_metrics" "$final_round2/$(basename "$group_metrics")"
 
   touch "$done_flag"
 done < "$groups_tsv"
@@ -80,7 +97,6 @@ import csv, sys, os
 
 initial_groups_tsv, groups_tsv, round2_summary, singletons_tsv, final_outdir, top_outdir = sys.argv[1:7]
 
-# --- helper: species from top-level mash ---
 def species_from_top3(outdir: str, isolate: str) -> str:
     path = os.path.join(outdir, "mash", isolate, f"{isolate}.mash-screen.top3_hits.txt")
     if not os.path.exists(path) or os.path.getsize(path) == 0:
@@ -98,17 +114,13 @@ def species_from_top3(outdir: str, isolate: str) -> str:
         return "NA"
     return f"{parts[0]} {parts[1]}"
 
-# --- Round1 group map (used only for singletons label in case you want it later; not written) ---
 r1_group = {}
 with open(initial_groups_tsv, newline="") as f:
     r = csv.DictReader(f, delimiter="\t")
     for row in r:
         r1_group[row["Isolate"].strip()] = row["Group"].strip()
 
-# --- collect all round2 assignments ---
-# final_groups files are in round2_summary as GroupX.final_groups.tsv
-final_rows = []  # Isolate, Species, Primary_Group, Secondary_Group
-
+final_rows = []
 with open(groups_tsv) as f:
     next(f)
     for line in f:
@@ -120,11 +132,10 @@ with open(groups_tsv) as f:
             r = csv.DictReader(fh, delimiter="\t")
             for row in r:
                 iso = row["Isolate"].strip()
-                sp  = row["Species"].strip()
-                secondary = row["Group"].strip()  # within-group cluster label (Group1/Group2/Unrelated)
+                sp = row["Species"].strip()
+                secondary = row["Group"].strip()
                 final_rows.append((iso, sp, grp, secondary))
 
-# --- add singletons (no round2 processing) as Primary=Unrelated, Secondary=Unrelated ---
 if os.path.exists(singletons_tsv) and os.path.getsize(singletons_tsv) > 0:
     with open(singletons_tsv, newline="") as f:
         r = csv.DictReader(f, delimiter="\t")
@@ -133,7 +144,6 @@ if os.path.exists(singletons_tsv) and os.path.getsize(singletons_tsv) > 0:
             sp = species_from_top3(top_outdir, iso)
             final_rows.append((iso, sp, "Unrelated", "Unrelated"))
 
-# sort by Primary_Group numeric then isolate
 def grp_num(g):
     if g.startswith("Group"):
         try: return int(g.replace("Group",""))
@@ -155,5 +165,9 @@ PY
 
 echo "[r2_step8] wrote:"
 echo "  ${FINAL_OUTDIR}/final_groups_all.tsv"
-echo "  ${FINAL_OUTDIR}/*.core.snp-dists.txt"
+echo "  ${final_round1}/core.snp-dists.txt"
+echo "  ${final_round1}/core_alignment_metrics.tsv"
+echo "  ${final_round2}/*.core.snp-dists.txt"
+echo "  ${final_round2}/*.core_alignment_metrics.tsv"
 echo "[r2_step8] done"
+

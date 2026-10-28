@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=findref
-#SBATCH --export=NONE
+# Environment is exported explicitly by the launcher
 
 set -euo pipefail
+
+: "${PIPELINE_ROOT:?ERROR: PIPELINE_ROOT is not set}"
+SCRIPT_DIR="${PIPELINE_ROOT}/workflow"
+source "${SCRIPT_DIR}/../scripts/setup_env.sh"
 
 # Args:
 #   1) samplesheet (CSV)
@@ -25,8 +29,6 @@ MASHROOT="$(readlink -f "$6")"
 [[ -d "$CHROM_FNA_DIR" ]]  || { echo "ERROR: missing chrom_fna dir: $CHROM_FNA_DIR" >&2; exit 1; }
 [[ -d "$MASHROOT/mash" ]]  || { echo "ERROR: missing mash output dir: $MASHROOT/mash" >&2; exit 1; }
 
-module use /project/amr_services/modulefiles/
-module load mash/2.3
 
 findref_dir="${OUTROOT}/findref"
 msh_dir="${findref_dir}/msh"

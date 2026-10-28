@@ -1,284 +1,225 @@
 # 🧬 UVA SNV Pipeline
 
-A SLURM-based whole genome SNV analysis pipeline for bacterial isolates\
-(Tested on UVA Rivanna HPC)
+A SLURM-based whole-genome single-nucleotide variant (SNV) analysis pipeline for bacterial isolates. **Tested on UVA Rivanna HPC.**
 
-------------------------------------------------------------------------
+## Overview
 
-##  Overview
+The pipeline performs:
 
-This pipeline performs:
+- Read quality control and trimming
+- Mash-based species identification and reference comparison for each isolate
+- Two rounds of reference-guided SNV calling with Snippy
+- SNP-based clustering with species annotations
+- Reporting of SNP distance matrices, callable core-alignment metrics, and final group assignments
+- Per-analysis software version and clustering-threshold provenance
 
--   Read QC and trimming
--   Mash-based speciation (per isolate)
--   **Two rounds of reference-guided SNV calling (Snippy)**
--   SNP-based clustering with species annotation
--   Final consolidated grouping table for reporting
+### Why two rounds of variant calling?
 
-------------------------------------------------------------------------
+Using one shared reference for a diverse collection of isolates can reduce the portion of the genome available for core-genome comparison and complicate interpretation of SNP distances. The pipeline therefore performs:
 
+1. **Round 1:** SNV calling across all isolates using a selected shared reference.
+2. **Initial clustering (default: 200 SNPs):** Identify broadly related groups.
+3. **Round 2:** Select a reference for each group and repeat SNV calling within that group.
+4. **Final clustering (default: 50 SNPs):** Resolve relatedness within each group.
 
-**Why two rounds of variant calling?**
+Singleton/unrelated isolates are included in the final grouping table but are not reprocessed in Round 2. Comparing the callable alignment percentages between rounds helps reveal how divergent isolates affect the shared core genome.
 
-Using a single shared reference for a diverse set of isolates can
-inflate SNP distances when distant isolates are included (mapping and
-variant calling become less comparable across the cohort).
+## Installation
 
-To reduce this effect, the pipeline runs:
+**Requirements:** A Linux HPC environment with SLURM, Conda (or a compatible environment manager), internet access for database installation, and storage accessible to both login and compute nodes. Commands below are run from the repository root unless stated otherwise.
 
-1.  **Round 1** --- SNV calling across all isolates
-2.  **Initial clustering (default: 200 SNP)** --- define broad
-    relatedness groups
-3.  **Round 2** --- re-select a reference per group and re-run SNV
-    calling
-4.  **Final clustering (default: 50 SNP)** --- within-group resolution
+### 1. Clone the repository and create the Conda environment
 
-Singleton/unrelated isolates are carried forward but are not reprocessed
-in Round 2.
-
-------------------------------------------------------------------------
-
-# Installation
-
-## 1️⃣ Clone the repository
-
-``` bash
+```bash
 git clone https://github.com/scastanedabarba/uva-snvpipe.git
 cd uva-snvpipe
+
+# Create the environment on a filesystem accessible to compute nodes.
+conda env create --prefix /path/to/shared/snvenv -f environment.yml
 ```
 
-------------------------------------------------------------------------
+The `environment.yml` file defines the pipeline dependencies, including Snippy, Mash, read QC tools, SNP distance tools, and Python packages for alignment metrics. A site-specific environment prefix is recommended for shared HPC installations.
 
-## 2️⃣ Download the reference database (Required)
+### 2. Configure the pipeline
 
-The pipeline requires the **UVA ESKAPE reference database**.
+Edit `config/config.sh` before installing the database or running an analysis:
 
-**Zenodo DOI:** `10.5281/zenodo.18838576`\
-**File:** `uva_eskape_2026-01-23.tar.gz`
+```bash
+# Absolute path to the installed Conda environment
+CONDA_ENV="/path/to/shared/snvenv"
 
-### Download database to the default location (inside the repo)
+# Set after database installation (Step 3)
+DB_DIR="/path/to/database_parent/databases/uva_eskape_2026-01-23"
 
-``` bash
-bash scripts/download_db.sh
+# SLURM settings; leave empty to use cluster defaults
+ACCOUNT="your_slurm_account"
+PARTITION="your_partition"
 ```
 
-Default install location:
+Review the `CPUS_*`, `MEM_*`, and `TIME_*` settings in the same file to match your cluster's resources and limits. `config/config.sh` contains site-specific settings; analysis output locations are supplied with `--outdir` when launching the pipeline.
 
-    databases/uva_eskape_2026-01-23/
+### 3. Download the reference database and set its path
 
-### Download database to a custom location
+The pipeline uses the **UVA ESKAPE reference database** (release `2026-01-23`).
 
-``` bash
-bash scripts/download_db.sh --output /scratch/my_databases
+- **Zenodo DOI:** [10.5281/zenodo.18838576](https://doi.org/10.5281/zenodo.18838576)
+- **Archive:** `uva_eskape_2026-01-23.tar.gz`
+
+The installer submits a SLURM job by default, downloads and verifies the archive, and extracts it into the `databases/` subdirectory of the supplied parent directory:
+
+```bash
+bash scripts/download_db.sh --outdir /path/to/database_parent
 ```
 
-Then run the pipeline with:
+The resulting database path is:
 
-``` bash
-bash bin/run_pipeline.sh --db-path /scratch/my_databases/uva_eskape_2026-01-23
+```text
+/path/to/database_parent/databases/uva_eskape_2026-01-23/
 ```
 
-------------------------------------------------------------------------
+Check the installer's submitted job and logs for successful completion. Then set `DB_DIR` in `config/config.sh` to this **extracted database directory** (not the archive or its parent). The database contains `mash/`, `chrom_fna/`, and supporting metadata. The installer also supports `--local` for execution without SLURM submission.
 
-## 3️⃣ Configure environment
+### 4. Prepare a samplesheet and run the pipeline
 
-Edit:
+Create a CSV file with the following header and one row per isolate:
 
-``` bash
-config/config.sh
+```csv
+sample,fastq_1,fastq_2
+ISO1,/path/to/ISO1_R1.fastq.gz,/path/to/ISO1_R2.fastq.gz
+ISO2,/path/to/ISO2_R1.fastq.gz,/path/to/ISO2_R2.fastq.gz
 ```
 
-Set:
+Use absolute paths to paired-end FASTQ files that compute nodes can access. Launch the pipeline with an explicit samplesheet and analysis output directory:
 
-``` bash
-ACCOUNT=
-PARTITION=
-OUTDIR=
-MODE=modules
+```bash
+bash bin/run_pipeline.sh \
+  --samplesheet /path/to/samplesheet.csv \
+  --outdir /path/to/analysis_results
 ```
 
-🔧 Required tools
--   Mash 2.3
--   TrimGalore
--   Trimmomatic 0.39
--   Java
--   Snippy
--   snp-sites
--   snp-dists
--   Python 3
+The launcher submits eight dependent SLURM stages. Follow their progress with `squeue -u "$USER"` or `sacct`, and inspect `slurm_logs/` in the analysis output directory if a stage fails. Successful job submission does not by itself confirm successful completion.
 
-> Note: this version is **modules-only** (no containers).
+## Usage options
 
-------------------------------------------------------------------------
+The database path defaults to `DB_DIR` in `config/config.sh`; override it for a particular run with `--db-path`:
 
-# Samplesheet format
-
-CSV header:
-
-    sample,fastq_1,fastq_2
-
-Example:
-
-    ISO1,/path/to/ISO1_R1.fastq.gz,/path/to/ISO1_R2.fastq.gz
-    ISO2,/path/to/ISO2_R1.fastq.gz,/path/to/ISO2_R2.fastq.gz
-
-Absolute paths to FASTQ files are required.
-
-------------------------------------------------------------------------
-
-# ▶️ Usage
-
-## Run with defaults
-
-``` bash
-bash bin/run_pipeline.sh
+```bash
+bash bin/run_pipeline.sh \
+  --samplesheet /path/to/samplesheet.csv \
+  --outdir /path/to/analysis_results \
+  --db-path /path/to/alternate_database
 ```
 
-## Specify samplesheet
+For a custom reference collection, you can specify the Mash sketch, mapping file, and reference FASTA directory explicitly:
 
-``` bash
-bash bin/run_pipeline.sh --samplesheet samplesheet.csv
-```
-
-## Specify output directory
-
-``` bash
-bash bin/run_pipeline.sh --outdir /scratch/my_run
-```
-
-## Specify database location
-
-``` bash
-bash bin/run_pipeline.sh --db-path /scratch/my_databases/uva_eskape_2026-01-23
-```
-
-## Specify custom database components
-
-The pipeline now supports fully custom databases as long as the following are provided:
-
-- Mash sketch (`.msh`)
-- Mash mapping file (`.mapping.txt`)
-- Reference FASTA directory
-
-``` bash
-bash bin/run_pipeline.sh 
-  --samplesheet samplesheet.csv 
-  --mash-sketch /path/to/db.msh 
-  --mash-mapping /path/to/db.mapping.txt 
+```bash
+bash bin/run_pipeline.sh \
+  --samplesheet /path/to/samplesheet.csv \
+  --outdir /path/to/analysis_results \
+  --mash-sketch /path/to/database.msh \
+  --mash-mapping /path/to/database.mapping.txt \
   --ref-dir /path/to/chrom_fna
 ```
 
-You can also mix with `--db-path`, where explicit arguments override defaults.
+The default clustering thresholds are 200 SNPs for Round 1 and 50 SNPs for Round 2. Override them if appropriate for the analysis:
 
-## Adjust clustering thresholds
-
-``` bash
-bash bin/run_pipeline.sh --round1-threshold 200 --round2-threshold 50
+```bash
+bash bin/run_pipeline.sh \
+  --samplesheet /path/to/samplesheet.csv \
+  --outdir /path/to/analysis_results \
+  --round1-threshold 200 \
+  --round2-threshold 50
 ```
 
-------------------------------------------------------------------------
+## Key outputs
 
-# Pipeline workflow
+All paths below are relative to the analysis directory passed to `--outdir`.
 
-Step 1 --- QC
--   TrimGalore
--   Trimmomatic
+### Final group assignments
 
-Output:
+**`final_output/final_groups_all.tsv`** is the consolidated reporting table:
 
-    OUTDIR/qc/<sample>/
+| Column | Description |
+|---|---|
+| `Isolate` | Sample identifier from the samplesheet |
+| `Species` | Species annotation derived from Mash results |
+| `Primary_Group` | Initial group assigned in Round 1 |
+| `Secondary_Group` | Within-group assignment in Round 2 |
 
-Step 2 --- Mash speciation
--   mash sketch
--   mash dist
--   mash screen
+Unrelated/singleton isolates are retained and labeled `Unrelated` rather than reprocessed in Round 2. Group names are analysis-specific labels, not stable identifiers across different runs.
 
-Output:
+### SNP distance matrices
 
-    OUTDIR/mash/<sample>/
+- **Round 1:** `final_output/round1/core.snp-dists.txt`
+- **Round 2:** `final_output/round2/GroupX.core.snp-dists.txt` (one matrix per processed group)
 
-Primary speciation output:
+These are pairwise SNP distance matrices from the respective core alignments. The **`Reference` row and column are intentionally retained** to show the selected reference's distance from each isolate. For relatedness interpretation, focus on isolate-to-isolate distances and consider the amount of shared callable genome.
 
-    OUTDIR/mash/<sample>/<sample>.mash-screen.top3_hits.txt
+The corresponding working outputs remain available under `variant_calling_round1/` and `variant_calling_round2/`.
 
-Round 1 --- SNV calling (all isolates)
+### Core-alignment metrics
 
-Reference selected to minimize Mash triangle distance.
+- **Round 1:** `final_output/round1/core_alignment_metrics.tsv`
+- **Round 2:** `final_output/round2/GroupX.core_alignment_metrics.tsv`
 
-Outputs:
+Each TSV contains one summary row for its `core.full.aln`, with:
 
-    OUTDIR/variant_calling_round1/
+| Column | Meaning |
+|---|---|
+| `Alignment_Path` | Path to the source `core.full.aln` |
+| `Total_Positions` | Total positions in the full alignment |
+| `Callable_Positions` | Positions without `-`, `N`, `X`, or `n` in any non-reference isolate |
+| `Excluded_Positions` | Positions excluded by that rule |
+| `Percent_Callable` | Callable positions divided by total positions, as a percentage |
 
-Includes:
+The percentage describes the shared callable alignment **across the isolates included in that round**, not an individual isolate's coverage. A divergent isolate can substantially reduce the Round 1 callable fraction; the Round 2 results provide a useful comparison after grouping more closely related isolates.
 
--   core.aln
--   core.full.aln
--   core.snp-dists.txt
--   initial_groups.tsv
+### Mash species identification and reference suitability
 
-Round 2 --- within-group SNV calling
+For each sample, review:
 
-Runs only for groups with ≥ 2 isolates.
+```text
+mash/<sample>/<sample>.mash-screen.top3_hits.txt
+```
 
-Outputs:
+This file reports the top Mash screen matches and should be checked for **species identification** and the strength of reference matches. As a practical QC guideline for this workflow, **more than 40,000 shared hashes** is considered supportive of an accurate reference mapping. This is a pipeline-specific heuristic rather than a universal Mash threshold: evaluate it alongside species concordance, competing matches, and the downstream alignment results. Low shared-hash counts or inconsistent species assignments warrant further review before interpreting SNP distances.
 
-    OUTDIR/variant_calling_round2/groups/GroupX/
+Additional Mash files are retained in each `mash/<sample>/` directory for troubleshooting and reference selection.
 
-Includes:
+### Analysis provenance
 
--   group-specific ref.fa
--   core.aln
--   GroupX.final_groups.tsv
+**`analysis_provenance.tsv`** records the pipeline Git version/commit, installed software versions, database information, and the Round 1 and Round 2 clustering thresholds used for the analysis. It documents analysis configuration, not SLURM execution or completion status.
 
+## Output directory structure
 
-------------------------------------------------------------------------
+```text
+analysis_results/
+├── analysis_provenance.tsv
+├── qc/
+├── mash/
+│   └── <sample>/
+│       └── <sample>.mash-screen.top3_hits.txt
+├── variant_calling_round1/
+│   ├── findref/
+│   ├── snippy/
+│   └── summary/
+├── variant_calling_round2/
+│   ├── manifest/
+│   ├── groups/
+│   └── summary/
+├── final_output/
+│   ├── final_groups_all.tsv
+│   ├── round1/
+│   │   ├── core.snp-dists.txt
+│   │   └── core_alignment_metrics.tsv
+│   └── round2/
+│       ├── Group1.core.snp-dists.txt
+│       ├── Group1.core_alignment_metrics.tsv
+│       └── ...
+└── slurm_logs/
+```
 
-# Key outputs
+## Version
 
-## Final deliverable
-
-    OUTDIR/final_output/final_groups_all.tsv
-
-Columns:
-
--   Isolate
--   Species
--   Primary_Group (Round 1)
--   Secondary_Group (Round 2)
-
-------------------------------------------------------------------------
-
-## SNP distance matrices
-
-Round 1:
-
-    variant_calling_round1/summary/core.snp-dists.txt
-
-Round 2:
-
-    variant_calling_round2/summary/GroupX.core.snp-dists.txt
-
-Copies are also placed in:
-
-    OUTDIR/final_output/
-
-------------------------------------------------------------------------
-
-# Output directory structure
-
-    OUTDIR/
-    ├── qc/
-    ├── mash/
-    ├── variant_calling_round1/
-    ├── variant_calling_round2/
-    ├── final_output/
-    └── slurm_logs/
-
-------------------------------------------------------------------------
-
-# Version
-
-**v0.2.0**\
-Two-round SNV calling with configurable thresholds and external database
-installation.
+The pipeline's Git tag/commit and installed dependency versions are recorded per analysis in `analysis_provenance.tsv`. See repository releases for the current pipeline version.
 

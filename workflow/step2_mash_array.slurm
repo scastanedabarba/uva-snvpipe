@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=mash
-#SBATCH --export=NONE
+# Environment is exported explicitly by the launcher
 
 set -euo pipefail
+
+: "${PIPELINE_ROOT:?ERROR: PIPELINE_ROOT is not set}"
+SCRIPT_DIR="${PIPELINE_ROOT}/workflow"
+source "${SCRIPT_DIR}/../scripts/setup_env.sh"
 
 SAMPLESHEET="$(readlink -f "$1")"
 OUTROOT="$(readlink -f "$2")"
@@ -52,13 +56,11 @@ if [[ -f "$done_flag" ]]; then
   exit 0
 fi
 
-if [[ "$MODE" != "modules" ]]; then
-  echo "ERROR: MODE must be 'modules' (got: $MODE)" >&2
+if [[ "$MODE" != "conda" ]]; then
+  echo "ERROR: MODE must be conda (got: $MODE)" >&2
   exit 2
 fi
 
-module use /project/amr_services/modulefiles/
-module load mash/2.3
 
 R1FASTQ="${qc_dir}/${ACCID}_R1.trim.fq.gz"
 R2FASTQ="${qc_dir}/${ACCID}_R2.trim.fq.gz"

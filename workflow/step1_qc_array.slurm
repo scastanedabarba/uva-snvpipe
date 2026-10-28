@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=qc_reads
-#SBATCH --export=NONE
+# Environment is exported explicitly by the launcher
 
 set -euo pipefail
+
+: "${PIPELINE_ROOT:?ERROR: PIPELINE_ROOT is not set}"
+SCRIPT_DIR="${PIPELINE_ROOT}/workflow"
+source "${SCRIPT_DIR}/../scripts/setup_env.sh"
 
 SAMPLESHEET="$1"
 OUTDIR_ROOT="$2"   # top-level OUTDIR
@@ -41,15 +45,11 @@ if [[ -f "$done_flag" ]]; then
   exit 0
 fi
 
-if [[ "$MODE" != "modules" ]]; then
-  echo "ERROR: MODE must be 'modules' (got: $MODE)" >&2
+if [[ "$MODE" != "conda" ]]; then
+  echo "ERROR: MODE must be conda (got: $MODE)" >&2
   exit 2
 fi
 
-module use /project/amr_services/modulefiles/
-module load trimgalore
-module load trimmomatic/0.39
-module load fastqc/0.11.9
 
 trim_galore --stringency 5 \
   --trim-n \
@@ -70,7 +70,7 @@ if [[ -z "${tg_r1_fastq}" || -z "${tg_r2_fastq}" ]]; then
   exit 1
 fi
 
-java -jar /project/amr_services/tools/Trimmomatic-0.39/trimmomatic-0.39.jar PE -phred33 \
+trimmomatic PE -phred33 \
   "$tg_r1_fastq" "$tg_r2_fastq" \
   "${sid}_R1.trim.fq.gz" "${sid}_R1.trim.unpaired.fq.gz" \
   "${sid}_R2.trim.fq.gz" "${sid}_R2.trim.unpaired.fq.gz" \
@@ -80,12 +80,12 @@ java -jar /project/amr_services/tools/Trimmomatic-0.39/trimmomatic-0.39.jar PE -
 cat "${sid}_R1.trim.unpaired.fq.gz" "${sid}_R2.trim.unpaired.fq.gz" > "${sid}_SE.trim.fq.gz"
 rm -f "${sid}_R1.trim.unpaired.fq.gz" "${sid}_R2.trim.unpaired.fq.gz"
 
-zcat "${sid}_R1.trim.fq.gz" | /project/amr_services/pipelines/amrpipe/scripts/fastqstats > "${sid}_R1.trim.fastqstats.txt"
-zcat "${sid}_R2.trim.fq.gz" | /project/amr_services/pipelines/amrpipe/scripts/fastqstats > "${sid}_R2.trim.fastqstats.txt"
+python "${SCRIPT_DIR}/../scripts/fastqstats.py" "${sid}_R1.trim.fq.gz" > "${sid}_R1.trim.fastqstats.txt"
+python "${SCRIPT_DIR}/../scripts/fastqstats.py" "${sid}_R2.trim.fq.gz" > "${sid}_R2.trim.fastqstats.txt"
 
 tg_ver="$(trim_galore --version 2>&1 | tr '\n' ' ' | sed -E 's/.*version[[:space:]]+([0-9][0-9.]*) .*/\1/' | head -n 1 || true)"
 ca_ver="$(cutadapt --version 2>&1 | head -n 1 || true)"
-tr_ver="$(java -jar /project/amr_services/tools/Trimmomatic-0.39/trimmomatic-0.39.jar -version 2>&1 | head -n 1 | sed -E 's/[^0-9]*([0-9.]*).*/\1/' || true)"
+tr_ver="$(trimmomatic -version 2>&1 | head -n 1 || true)"
 jv_ver="$(java -version 2>&1 | head -n 1 | sed -E 's/.*version "([^"]+)".*/\1/' || true)"
 
 cat > versions.yml <<END_VERSIONS

@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=r2_snippy
-#SBATCH --export=NONE
+# Environment is exported explicitly by the launcher
 
 set -euo pipefail
+
+: "${PIPELINE_ROOT:?ERROR: PIPELINE_ROOT is not set}"
+SCRIPT_DIR="${PIPELINE_ROOT}/workflow"
+source "${SCRIPT_DIR}/../scripts/setup_env.sh"
 
 SAMPLESHEET="$1"
 OUTDIR_ROOT="$(readlink -f "$2")"
@@ -26,9 +30,9 @@ print(sid, r1, r2)
 PY
 )
 
-# modules-only
-if [[ "$MODE" != "modules" ]]; then
-  echo "ERROR: MODE must be 'modules' (got: $MODE)" >&2
+# Conda mode
+if [[ "$MODE" != "conda" ]]; then
+  echo "ERROR: MODE must be conda (got: $MODE)" >&2
   exit 2
 fi
 
@@ -60,12 +64,6 @@ if [[ -f "${snippy_out}/snippy.done" ]]; then
   exit 0
 fi
 
-module purge || true
-module load miniforge
-module load java
-set +u
-source activate /project/amr_services/.conda/amrpipe-snippy-env
-set -u
 
 echo "[r2_step7] grp=${grp} sid=${sid}"
 echo "[r2_step7] ref=${ref_fa}"

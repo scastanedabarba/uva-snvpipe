@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=r2_findref
-#SBATCH --export=NONE
+# Environment is exported explicitly by the launcher
 
 set -euo pipefail
+
+: "${PIPELINE_ROOT:?ERROR: PIPELINE_ROOT is not set}"
+SCRIPT_DIR="${PIPELINE_ROOT}/workflow"
+source "${SCRIPT_DIR}/../scripts/setup_env.sh"
 
 SAMPLESHEET="$(readlink -f "$1")"
 OUTDIR_ROOT="$(readlink -f "$2")"
@@ -20,8 +24,6 @@ INITIAL_GROUPS="${ROUND1_OUTDIR}/summary/initial_groups.tsv"
 [[ -s "$MAP_TSV" ]]        || { echo "ERROR: missing mapping file: $MAP_TSV" >&2; exit 1; }
 [[ -d "$CHROM_FNA_DIR" ]]  || { echo "ERROR: missing chrom_fna dir: $CHROM_FNA_DIR" >&2; exit 1; }
 
-module use /project/amr_services/modulefiles/
-module load mash/2.3
 
 manifest_dir="${ROUND2_OUTDIR}/manifest"
 members_dir="${manifest_dir}/group_members"
