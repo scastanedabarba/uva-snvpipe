@@ -13,7 +13,7 @@ from pathlib import Path
 PACKAGES = (
     'python', 'snippy', 'mash', 'snp-dists', 'snp-sites',
     'trim-galore', 'trimmomatic', 'cutadapt', 'fastqc', 'openjdk',
-    'biopython', 'pandas', 'numpy', 'python-dateutil', 'aria2', 'curl',
+    'numpy', 'python-dateutil', 'aria2', 'curl',
 )
 
 

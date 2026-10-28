@@ -171,7 +171,10 @@ Each TSV contains one summary row for its `core.full.aln`, with:
 | `Excluded_Positions` | Positions excluded by that rule |
 | `Percent_Callable` | Callable positions divided by total positions, as a percentage |
 
-The percentage describes the shared callable alignment **across the isolates included in that round**, not an individual isolate's coverage. A divergent isolate can substantially reduce the Round 1 callable fraction; the Round 2 results provide a useful comparison after grouping more closely related isolates.
+**Interpretation:** These metrics quantify the portion of the reference-aligned genome that is available for **shared SNV comparisons** across all isolates in the analysis. They provide a useful proxy for how much of the genome contributes to the core-genome SNP distance analysis. A low `Percent_Callable` indicates that a substantial fraction of the alignment is excluded from shared comparisons. This can happen when the selected reference is genetically distant from one or more isolates, leading to reduced read mapping, coverage gaps, or ambiguous calls.
+
+The metric is cohort-dependent: even one divergent or poorly covered isolate can sharply reduce the Round 1 callable fraction. Round 2 uses group-specific references and more closely related isolates, so its callable percentage may improve. **Compare the percentages between rounds and review them alongside Mash reference matches and SNP matrices.** A high callable percentage alone does not guarantee accurate variant calls, and no universal minimum acceptance threshold is implied.
+
 
 ### Mash species identification and reference suitability
 
