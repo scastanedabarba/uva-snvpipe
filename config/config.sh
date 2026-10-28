@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Site-specific settings. Edit before running.
 # Absolute path to a Conda environment shared by login and compute nodes.
-CONDA_ENV="/sfs/weka/scratch/sgj4qr/snvpipeline/snvenv"
+CONDA_ENV=""
 
 # Reference database installation directory
-DB_DIR="/scratch/sgj4qr/snvpipeline/databases/uva_eskape_2026-01-23"
+DB_DIR=""
 
 # SLURM settings: leave ACCOUNT or PARTITION empty to use cluster defaults.
-ACCOUNT="amr_services_paid"
-PARTITION="standard"
+ACCOUNT=""
+PARTITION=""
 
 # Resources per step (CPU, memory, walltime)
 CPUS_QC=1; MEM_QC="8G"; TIME_QC="01:00:00"
