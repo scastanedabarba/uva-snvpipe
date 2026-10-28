@@ -7,9 +7,8 @@ A SLURM-based whole-genome single-nucleotide variant (SNV) analysis pipeline for
 The pipeline performs:
 
 - Read quality control and trimming
-- Mash-based species identification and reference comparison for each isolate
+- Mash-based species identification
 - Two rounds of reference-guided SNV calling with Snippy
-- SNP-based clustering with species annotations
 - Reporting of SNP distance matrices, callable core-alignment metrics, and final group assignments
 - Per-analysis software version and clustering-threshold provenance
 
@@ -26,7 +25,7 @@ Singleton/unrelated isolates are included in the final grouping table but are no
 
 ## Installation
 
-**Requirements:** A Linux HPC environment with SLURM, Conda (or a compatible environment manager), internet access for database installation, and storage accessible to both login and compute nodes. Commands below are run from the repository root unless stated otherwise.
+**Requirements:** A Linux HPC environment with SLURM and Conda (or a compatible environment manager). Commands below are run from the repository root unless stated otherwise.
 
 ### 1. Clone the repository and create the Conda environment
 
