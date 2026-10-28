@@ -218,6 +218,39 @@ analysis_results/
 └── slurm_logs/
 ```
 
+## Planned Enhancements
+
+Future development will focus on portability, flexibility in reference selection, and broader coverage of clinically relevant bacteria:
+
+- **Nextflow implementation:** Reimplement the workflow in Nextflow to improve portability across computing environments and support reproducible workflow execution.
+- **User-provided reference genome:** Add an option to supply a specific reference FASTA for SNV calling instead of using automatic reference selection.
+- **Custom database generation by genus:** Provide tools to build Mash and reference genome databases by selecting bacterial genera of interest.
+- **Expanded reference database:** Add further clinically relevant bacterial genera to the distributed reference database.
+
+These are planned features and are not available in the current release. The existing custom database component options (`--mash-sketch`, `--mash-mapping`, and `--ref-dir`) require users to provide a prepared database; they do not automatically construct one.
+
+## References
+
+The following software and publications underpin the pipeline. For the **versions actually used in an analysis**, consult `analysis_provenance.tsv`; the bibliography is not a list of installed versions.
+
+### Read quality control and preprocessing
+
+- **FastQC:** Andrews, S. (2010). *FastQC: A quality control tool for high throughput sequence data*. [Software repository](https://github.com/s-andrews/fastqc).
+- **Trim Galore:** Krueger, F. (2026). *Trim Galore* (Version 2.2.0) [Computer software]. [Software repository](https://github.com/FelixKrueger/TrimGalore). *(Bibliographic version; the tested pipeline environment uses Trim Galore 0.6.10.)*
+- **Cutadapt:** Martin, M. (2011). Cutadapt removes adapter sequences from high-throughput sequencing reads. *EMBnet.journal, 17*(1), 10–12. [Article](https://journal.embnet.org/index.php/embnetjournal/article/view/200/479).
+- **Trimmomatic:** Beier, S., Bolger, A. M., Bolger, M. E., Schwacke, R., & Usadel, B. (2026). Trimmomatic: A decade of feature-rich, high-performance NGS read preprocessing. *Bioinformatics*. [https://doi.org/10.1093/bioinformatics/btag331](https://doi.org/10.1093/bioinformatics/btag331).
+
+### Species identification and reference selection
+
+- **Mash:** Ondov, B. D., Treangen, T. J., Melsted, P., Mallonee, A. B., Bergman, N. H., Koren, S., & Phillippy, A. M. (2016). Mash: Fast genome and metagenome distance estimation using MinHash. *Genome Biology, 17*, 132. [https://doi.org/10.1186/s13059-016-0997-x](https://doi.org/10.1186/s13059-016-0997-x).
+- **Mash Screen:** Ondov, B. D., Starrett, G. J., Sappington, A., Kostic, A., Koren, S., Buck, C. B., & Phillippy, A. M. (2019). Mash Screen: High-throughput sequence containment estimation for genome discovery. *Genome Biology, 20*, 232. [https://doi.org/10.1186/s13059-019-1841-x](https://doi.org/10.1186/s13059-019-1841-x).
+
+### Variant calling and SNP analysis
+
+- **Snippy:** Seemann, T. *Snippy: Rapid haploid variant calling and core genome alignment*. [Software repository](https://github.com/tseemann/snippy).
+- **snp-dists:** Seemann, T. *snp-dists: Pairwise SNP distance matrix from a FASTA sequence alignment*. [Software repository](https://github.com/tseemann/snp-dists).
+- **SNP-sites:** Page, A. J., Taylor, B., Delaney, A. J., Soares, J., Seemann, T., Keane, J. A., & Harris, S. R. (2016). SNP-sites: Rapid efficient extraction of SNPs from multi-FASTA alignments. *Microbial Genomics, 2*(4), e000056. [https://doi.org/10.1099/mgen.0.000056](https://doi.org/10.1099/mgen.0.000056).
+
 ## Version
 
 The pipeline's Git tag/commit and installed dependency versions are recorded per analysis in `analysis_provenance.tsv`. See repository releases for the current pipeline version.
